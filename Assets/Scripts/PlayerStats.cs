@@ -10,7 +10,7 @@ public class PlayerStats : MonoBehaviour
 
     void Awake()
     {
-        // シングルトンの設定
+        // シングルトンの設定（他からアクセスしやすくするため）
         if (Instance == null) Instance = this;
     }
 

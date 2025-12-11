@@ -330,10 +330,13 @@ public class GameManager : MonoBehaviour
 
     IEnumerator ShopSequence(bool isDiscount)
     {
-        if (HasFriendEffect(FriendEffectType.ShopDiscount)) isDiscount = true; // エミ効果
+        // 親友エミ効果があれば常に割引
+        if (HasFriendEffect(FriendEffectType.ShopDiscount)) isDiscount = true;
 
-        if (shopPanel) shopPanel.SetActive(true);
-        if (shopInfoText) shopInfoText.text = isDiscount ? "<color=red>全品 20% OFF!</color>" : "いらっしゃいませ";
+        if (shopPanel != null) shopPanel.SetActive(true);
+
+        // ★修正: 「いらっしゃいませ」の下に現在の所持金を表示
+        UpdateShopInfoText(isDiscount);
 
         // ボタン生成
         foreach (Transform child in shopContent) Destroy(child.gameObject);
@@ -341,19 +344,30 @@ public class GameManager : MonoBehaviour
         foreach (var item in shopItems)
         {
             GameObject btnObj = Instantiate(shopItemPrefab, shopContent);
+
+            // 価格計算
             int price = isDiscount ? (int)(item.price * 0.8f) : item.price;
 
-            // テキスト設定
+            // ★修正: テキストに価格を確実に反映 (改行して見やすく)
             TextMeshProUGUI txt = btnObj.GetComponentInChildren<TextMeshProUGUI>();
-            if (txt) txt.text = $"{item.itemName}\n{price}G";
+            if (txt)
+            {
+                txt.text = $"{item.itemName}\n<size=80%>{price} GP</size>";
+            }
 
             Button btn = btnObj.GetComponent<Button>();
-            btn.onClick.AddListener(() => OnBuyItem(item, price));
 
-            if (playerStats.gp < price) btn.interactable = false;
+            // 購入ボタンの処理 (価格を渡す)
+            btn.onClick.AddListener(() => OnBuyItem(item, price, btn));
+
+            // ★修正: GPが足りない、または在庫がない(未実装だが枠組みとして)場合は押せないようにする
+            // ここではGP不足のチェック
+            if (playerStats.gp < price)
+            {
+                btn.interactable = false;
+            }
         }
 
-        // 閉じるボタンが押されるまで待機
         isShopOpen = true;
         while (isShopOpen)
         {
@@ -362,8 +376,18 @@ public class GameManager : MonoBehaviour
 
         if (shopPanel) shopPanel.SetActive(false);
 
-        // マスに止まっていたならターン終了、通過中ならEndTurnせず移動再開へ戻る
+        // マスに止まっていたならターン終了、通過中なら移動再開
         if (boardLayout[currentTileIndex] == "Shop") EndTurn();
+    }
+
+    // ★追加: ショップのメッセージ更新用ヘルパー
+    void UpdateShopInfoText(bool isDiscount)
+    {
+        if (shopInfoText != null)
+        {
+            string msg = isDiscount ? "<color=red>全品 20% OFF!</color>" : "いらっしゃいませ";
+            shopInfoText.text = $"{msg}\n所持金: {playerStats.gp:N0} GP";
+        }
     }
 
     public void CloseShop()
@@ -371,14 +395,67 @@ public class GameManager : MonoBehaviour
         isShopOpen = false; // ループを抜ける
     }
 
-    void OnBuyItem(ShopItem item, int price)
+    void OnBuyItem(ShopItem item, int price, Button clickedButton)
     {
+        // GPチェック (念のため)
         if (playerStats.gp >= price)
         {
+            // 支払いと効果発動
             playerStats.gp -= price;
             item.onBuy.Invoke();
-            UpdateUI();
-            // ボタンの再生成などは省略（簡易実装）
+
+            AddLog($"購入: {item.itemName} (-{price}GP)");
+
+            // UI更新
+            UpdateUI(); // メイン画面のステータス更新
+
+            // ★修正: ショップ内の所持金表示を更新
+            // 割引状態かどうか判定してテキスト更新 (簡易的にエミ効果か現在マスかで判定)
+            bool isDiscount = (boardLayout[currentTileIndex] == "Shop") || HasFriendEffect(FriendEffectType.ShopDiscount);
+            UpdateShopInfoText(isDiscount);
+
+            // ★修正: 所持金が減ったので、買えなくなった商品のボタンを無効化する
+            // ShopContent内の全ボタンを走査して再チェック
+            foreach (Transform child in shopContent)
+            {
+                Button btn = child.GetComponent<Button>();
+                TextMeshProUGUI txt = child.GetComponentInChildren<TextMeshProUGUI>();
+
+                // テキストから価格を逆算するのは不安定なので、簡易的に再判定
+                // ※本来はShopItemとButtonを紐づけるクラス管理が良いが、
+                //   今回はテキスト内の数字("150 GP")などをパースするか、
+                //   単純に「今のボタン」以外も全てチェックするロジックにします。
+
+                // ここではシンプルに「クリックしたボタン」が連打できないようにする制御のみ記載し、
+                // 全体更新は再度ShopSequenceを呼ぶのが確実ですが、ちらつくため
+                // 簡易的に「所持金が0になったら全無効」等の処理を入れるか、
+                // あるいは「買えるかどうか」をボタンに持たせる必要があります。
+
+                // 今回は「購入後にGPがマイナスになることはない」前提で、
+                // 「購入後にGPが不足したボタンを無効化」する処理を追加します。
+
+                // テキストから "数値 GP" を取り出して判定（簡易実装）
+                if (txt != null)
+                {
+                    // 改行で分割して2行目（価格）を取得
+                    string[] lines = txt.text.Split('\n');
+                    if (lines.Length >= 2)
+                    {
+                        string priceStr = System.Text.RegularExpressions.Regex.Replace(lines[1], @"[^0-9]", "");
+                        if (int.TryParse(priceStr, out int itemPrice))
+                        {
+                            if (playerStats.gp < itemPrice)
+                            {
+                                btn.interactable = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            AddLog("GPが足りません！");
         }
     }
 
@@ -549,7 +626,7 @@ public class GameManager : MonoBehaviour
 
     void UpdateUI()
     {
-        // 季節計算: マス番号(0-47)を4で割って月を算出 (0-3:4月, 4-7:5月...)
+        // 季節計算: マス番号(0-47)を4で割って月を算出
         int monthOffset = currentTileIndex / 4;
         playerStats.currentMonth = 4 + monthOffset;
         if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
@@ -558,13 +635,13 @@ public class GameManager : MonoBehaviour
         if (dateText != null)
             dateText.text = $"{currentGrade}年目\n{playerStats.currentMonth}月";
 
-        // 資産表示 (縦並び)
+        // 資産表示 (縦並び: GPと値を改行、友達と値を改行)
         if (assetText != null)
             assetText.text = $"GP\n{playerStats.gp:N0}\n\n友\n{playerStats.friends}人";
 
-        // ステータス表示 (縦並び)
+        // ステータス表示 (縦並び: 各ステータスごとに改行)
         if (statusText != null)
-            statusText.text = $"Com\n{playerStats.commuLv}\n\nGal\n{playerStats.galLv}\n\nLem\n{playerStats.lemonLv}";
+            statusText.text = $"コミュ力: Lv{playerStats.commuLv}\nギャル力: Lv{playerStats.galLv}\nレモン力: Lv{playerStats.lemonLv}";
     }
 
     // --- マップ生成・親友初期化 (省略なし) ---
