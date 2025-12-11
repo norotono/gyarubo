@@ -10,6 +10,7 @@ public class PlayerStats : MonoBehaviour
 
     void Awake()
     {
+        // シングルトンの設定
         if (Instance == null) Instance = this;
     }
 
@@ -32,16 +33,16 @@ public class PlayerStats : MonoBehaviour
     public int maleFriendCount = 0;
     public int boyfriendAbilityType = 0;
 
-    // --- 所持アイテム (★ここがエラー箇所でした) ---
+    // --- 所持アイテム ---
     public List<int> moveCards = new List<int>();
     public int studentIdCount = 0;
     public int present = 0;
-    public int eventForce = 0; // ★この行が必要
+    public int eventForce = 0; // イベント強制アイテム
 
     // --- シングルプレイ用: 卒業アルバム価格 ---
     public int albumPrice = 1000;
 
-    // --- カウンタ ---
+    // --- 各種カウンタ（親友出現条件用） ---
     public int maleContactCount = 0;
     public int gpIncreaseTileCount = 0;
     public int gpDecreaseTileCount = 0;
@@ -50,16 +51,17 @@ public class PlayerStats : MonoBehaviour
     public int soloPlayConsecutive = 0;
     public int totalSteps = 0;
 
-    // --- 給料計算 ---
+    // --- 給料計算メソッド ---
     public int CalculateSalary(int shinyuCount)
     {
         // 基本給100 + 友達x10 + 親友x50
         return 100 + (friends * 10) + (shinyuCount * 50);
     }
 
-    // ステータス判定
+    // --- ステータス判定メソッド ---
     public bool IsAllStatsOver(int value)
     {
+        // 彼氏が3人以上なら全ステータス+1扱い（ハーレムボーナス）
         int bonus = (boyfriendCount >= 3) ? 1 : 0;
         return (commuLv + bonus) >= value &&
                (galLv + bonus) >= value &&

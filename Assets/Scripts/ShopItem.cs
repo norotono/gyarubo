@@ -3,10 +3,10 @@ using System;
 [Serializable]
 public class ShopItem
 {
-    public string itemName;    // ¤•i–¼
-    public int price;          // ‰¿Ši
-    public string description; // à–¾
-    public Action onBuy;       // ”ƒ‚Á‚½‚ÌŒø‰Ê
+    public string itemName;
+    public int price;
+    public string description;
+    public Action onBuy;
 
     public ShopItem(string name, int price, string desc, Action onBuyAction)
     {
