@@ -626,24 +626,23 @@ public class GameManager : MonoBehaviour
 
     void UpdateUI()
     {
-        // 季節計算: マス番号(0-47)を4で割って月を算出
+        // 季節計算
         int monthOffset = currentTileIndex / 4;
         playerStats.currentMonth = 4 + monthOffset;
         if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
 
-        // 日付表示
+        // ★修正: 日付表示（改行なし）
         if (dateText != null)
-            dateText.text = $"{currentGrade}年目\n{playerStats.currentMonth}月";
+            dateText.text = $"{currentGrade}年目 {playerStats.currentMonth}月";
 
-        // 資産表示 (縦並び: GPと値を改行、友達と値を改行)
+        // ★修正: 資産表示（友:〇〇 GP:〇〇 の形式）
         if (assetText != null)
-            assetText.text = $"GP\n{playerStats.gp:N0}\n\n友\n{playerStats.friends}人";
+            assetText.text = $"友: {playerStats.friends}人\nGP: {playerStats.gp:N0}";
 
-        // ステータス表示 (縦並び: 各ステータスごとに改行)
+        // ステータス表示
         if (statusText != null)
             statusText.text = $"コミュ力: Lv{playerStats.commuLv}\nギャル力: Lv{playerStats.galLv}\nレモン力: Lv{playerStats.lemonLv}";
     }
-
     // --- マップ生成・親友初期化 (省略なし) ---
     void InitializeFriends()
     {
@@ -667,36 +666,84 @@ public class GameManager : MonoBehaviour
 
     void CreateBoard()
     {
+        // 既存のマスを全て削除
         foreach (Transform child in boardParent) Destroy(child.gameObject);
+
+        // ---------------------------------------------------------
+        // 1. 論理マップデータの作成
+        // ---------------------------------------------------------
         boardLayout = new string[totalTiles];
 
-        // 固定マス設定
+        // --- 固定マスの配置 ---
         boardLayout[0] = "Start";
-        boardLayout[24] = "Middle";
-        boardLayout[46] = "Shop";
+        boardLayout[24] = "Middle"; // 中間地点
 
-        // ★修正: 3年生のみゴール、それ以外は通常移動用のマスにする
-        boardLayout[47] = (currentGrade == 3) ? "Goal" : "Event";
-
-        if (currentGrade >= 2)
+        // ★ショップとゴールの配置ルール修正
+        if (currentGrade == 3)
         {
-            int[] cIdx = { 5, 13, 21, 29, 37, 45 };
-            foreach (int i in cIdx) if (i < totalTiles) boardLayout[i] = "Classroom";
-        }
-
-        List<string> p = new List<string>();
-        if (currentGrade == 1)
-        {
-            AddTiles(p, "Male", 12); AddTiles(p, "Event", 12); AddTiles(p, "Shop", 1);
-            AddTiles(p, "FriendPlus", 8); AddTiles(p, "GPPlus", 6); AddTiles(p, "GPMinus", 4); AddTiles(p, "FriendMinus", 2);
+            // 3階: 最後(47)がゴール、その手前(46)がショップ
+            boardLayout[totalTiles - 1] = "Goal";
+            boardLayout[totalTiles - 2] = "Shop";
         }
         else
         {
-            AddTiles(p, "GPPlus", 10); AddTiles(p, "FriendPlus", 8); AddTiles(p, "Event", 12);
-            AddTiles(p, "Shop", 1); AddTiles(p, "GPMinus", 4); AddTiles(p, "Male", 3); AddTiles(p, "FriendMinus", 2);
+            // 1,2階: 最後(47)がショップ（ゴール・イベント等は置かない）
+            boardLayout[totalTiles - 1] = "Shop";
         }
-        p = p.OrderBy(x => Random.value).ToList();
 
+        // 教室マスの設定 (配置済みでない場所のみ)
+        if (currentGrade >= 2)
+        {
+            int[] cIdx = { 5, 13, 21, 29, 37, 45 };
+            foreach (int i in cIdx)
+            {
+                if (i < totalTiles && string.IsNullOrEmpty(boardLayout[i]))
+                    boardLayout[i] = "Classroom";
+            }
+        }
+
+        // --- ランダムマスのリスト作成 ---
+        List<string> p = new List<string>();
+
+        // ★ランダムショップの生成ルール
+        // 「3階以外はランダムなマス一つに生成」に従い、3階にはランダムショップを入れない
+        if (currentGrade == 1)
+        {
+            AddTiles(p, "Shop", 1); // ランダム枠
+
+            AddTiles(p, "Male", 12);
+            AddTiles(p, "Event", 12);
+            AddTiles(p, "FriendPlus", 8);
+            AddTiles(p, "GPPlus", 6);
+            AddTiles(p, "GPMinus", 4);
+            AddTiles(p, "FriendMinus", 2);
+        }
+        else if (currentGrade == 2)
+        {
+            AddTiles(p, "Shop", 1); // ランダム枠
+
+            AddTiles(p, "GPPlus", 10);
+            AddTiles(p, "FriendPlus", 8);
+            AddTiles(p, "Event", 12);
+            AddTiles(p, "GPMinus", 4);
+            AddTiles(p, "Male", 3);
+            AddTiles(p, "FriendMinus", 2);
+        }
+        else // currentGrade == 3
+        {
+            // 3階はランダムショップなし
+            AddTiles(p, "GPPlus", 10);
+            AddTiles(p, "FriendPlus", 8);
+            AddTiles(p, "Event", 12);
+            AddTiles(p, "GPMinus", 4);
+            AddTiles(p, "Male", 3);
+            AddTiles(p, "FriendMinus", 2);
+        }
+
+        // シャッフル
+        p = p.OrderBy(x => UnityEngine.Random.value).ToList();
+
+        // 空きマスにランダム配置
         int pIdx = 0;
         for (int i = 0; i < totalTiles; i++)
         {
@@ -704,15 +751,36 @@ public class GameManager : MonoBehaviour
             {
                 boardLayout[i] = (pIdx < p.Count) ? p[pIdx++] : "Normal";
             }
+        }
+
+        // ---------------------------------------------------------
+        // 2. 視覚オブジェクトの生成 (スネイク配置)
+        // ---------------------------------------------------------
+        int columns = 8;
+        for (int visualIndex = 0; visualIndex < totalTiles; visualIndex++)
+        {
+            int row = visualIndex / columns;
+            int col = visualIndex % columns;
+            int logicalIndex;
+
+            if (row % 2 == 0)
+            {
+                logicalIndex = visualIndex; // 偶数行: 左→右
+            }
+            else
+            {
+                int rowStart = row * columns;
+                logicalIndex = rowStart + (columns - 1 - col); // 奇数行: 右←左
+            }
+
             GameObject t = Instantiate(tilePrefab, boardParent);
-            t.name = $"Tile_{i}_{boardLayout[i]}";
+            t.name = $"Tile_{logicalIndex}_{boardLayout[logicalIndex]}";
 
             TileData td = t.GetComponent<TileData>();
             if (td != null)
             {
-                // ここは論理インデックスのまま渡す
-                td.index = i;
-                td.type = ConvertStr(boardLayout[i]);
+                td.index = logicalIndex;
+                td.type = ConvertStr(boardLayout[logicalIndex]);
                 td.UpdateVisuals();
             }
         }

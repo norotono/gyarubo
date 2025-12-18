@@ -68,7 +68,7 @@ MonoBehaviour:
   m_text: "\u30A2\u30A4\u30C6\u30E0\u3060\u3079\u30FC"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
-  m_sharedMaterial: {fileID: 5853342222099462890, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
+  m_sharedMaterial: {fileID: 8193923773358487924, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
