@@ -1,4 +1,4 @@
-ï»¿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
@@ -11,24 +11,24 @@ public class BoardManager : MonoBehaviour
     public Transform playerPiece;
     public int totalTiles = 48;
 
-    // ï¿½Oï¿½ï¿½ï¿½ï¿½ï¿½çŒ»ï¿½Ý‚Ìƒ}ï¿½bï¿½vï¿½ï¿½ï¿½ï¿½ï¿½Qï¿½Æ‚ï¿½ï¿½é‚½ï¿½ß‚Ìƒvï¿½ï¿½ï¿½pï¿½eï¿½B
+    // ŠO•”‚©‚çŒ»Ý‚Ìƒ}ƒbƒvî•ñ‚ðŽQÆ‚·‚é‚½‚ß‚ÌƒvƒƒpƒeƒB
     public string[] BoardLayout { get; private set; }
 
-    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    // ‰Šú‰»ˆ—
     public void InitializeBoard(int currentGrade)
     {
-        // ï¿½ï¿½ï¿½ï¿½ï¿½Ìƒ}ï¿½Xï¿½Ìíœ
+        // Šù‘¶‚Ìƒ}ƒX‚Ìíœ
         foreach (Transform child in boardParent) Destroy(child.gameObject);
 
         BoardLayout = new string[totalTiles];
 
-        // 1. ï¿½Å’ï¿½}ï¿½Xï¿½Ì”zï¿½u
-        // ï¿½ï¿½ï¿½Cï¿½ï¿½: 1ï¿½Nï¿½ï¿½ï¿½ÌŽï¿½ï¿½ï¿½ï¿½ï¿½0ï¿½Ô‚ï¿½Startï¿½É‚ï¿½ï¿½ï¿½Bï¿½ï¿½ï¿½ï¿½ÈŠOï¿½ï¿½Normalï¿½iï¿½Ê‰ß“_ï¿½j
+        // 1. ŒÅ’èƒ}ƒX‚Ì”z’u
+        // šC³: 1”N¶‚ÌŽž‚¾‚¯0”Ô‚ðStart‚É‚·‚éB‚»‚êˆÈŠO‚ÍNormali’Ê‰ß“_j
         BoardLayout[0] = (currentGrade == 1) ? "Start" : "Normal";
 
-        BoardLayout[24] = "Middle"; // ï¿½ï¿½ï¿½Ô’nï¿½_
+        BoardLayout[24] = "Middle"; // ’†ŠÔ’n“_
 
-        // ï¿½wï¿½Nï¿½ï¿½ï¿½Æ‚ÌƒSï¿½[ï¿½ï¿½ï¿½Eï¿½Vï¿½ï¿½ï¿½bï¿½vï¿½zï¿½u
+        // Šw”N‚²‚Æ‚ÌƒS[ƒ‹EƒVƒ‡ƒbƒv”z’u
         if (currentGrade == 3)
         {
             BoardLayout[totalTiles - 1] = "Goal";
@@ -39,7 +39,7 @@ public class BoardManager : MonoBehaviour
             BoardLayout[totalTiles - 1] = "Shop";
         }
 
-        // ï¿½ï¿½ï¿½ï¿½ï¿½}ï¿½Xï¿½Ì”zï¿½u (2ï¿½Nï¿½ï¿½ï¿½Èï¿½)
+        // ‹³Žºƒ}ƒX‚Ì”z’u (2”N¶ˆÈã)
         if (currentGrade >= 2)
         {
             int[] cIdx = { 5, 13, 21, 29, 37, 45 };
@@ -50,7 +50,7 @@ public class BoardManager : MonoBehaviour
             }
         }
 
-        // 2. ï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½ï¿½ï¿½}ï¿½Xï¿½Ì”zï¿½u
+        // 2. ƒ‰ƒ“ƒ_ƒ€ƒ}ƒX‚Ì”z’u
         List<string> p = new List<string>();
 
         if (currentGrade == 1)
@@ -62,17 +62,17 @@ public class BoardManager : MonoBehaviour
         }
         else
         {
-            // 2,3ï¿½Nï¿½ï¿½ï¿½pï¿½oï¿½ï¿½ï¿½ï¿½ï¿½X
+            // 2,3”N¶—pƒoƒ‰ƒ“ƒX
             if (currentGrade == 2) AddTiles(p, "Shop", 1);
             AddTiles(p, "GPPlus", 10); AddTiles(p, "FriendPlus", 8);
             AddTiles(p, "Event", 12); AddTiles(p, "GPMinus", 4);
             AddTiles(p, "Male", 3); AddTiles(p, "FriendMinus", 2);
         }
 
-        // ï¿½Vï¿½ï¿½ï¿½bï¿½tï¿½ï¿½
+        // ƒVƒƒƒbƒtƒ‹
         p = p.OrderBy(x => Random.value).ToList();
 
-        // ï¿½ó‚«ƒ}ï¿½Xï¿½É–ï¿½ï¿½ß‚ï¿½
+        // ‹ó‚«ƒ}ƒX‚É–„‚ß‚é
         int pIdx = 0;
         for (int i = 0; i < totalTiles; i++)
         {
@@ -82,7 +82,7 @@ public class BoardManager : MonoBehaviour
             }
         }
 
-        // 3. ï¿½ï¿½ï¿½oï¿½Iï¿½Èï¿½ï¿½ï¿½ï¿½iï¿½Xï¿½lï¿½Cï¿½Nï¿½zï¿½uï¿½j
+        // 3. Ž‹Šo“I‚È¶¬iƒXƒlƒCƒN”z’uj
         GenerateVisualTiles();
     }
 
@@ -93,13 +93,13 @@ public class BoardManager : MonoBehaviour
 
     void GenerateVisualTiles()
     {
-        int columns = 8; // 1ï¿½s8ï¿½}ï¿½X
+        int columns = 8; // 1s8ƒ}ƒX
         for (int visualIndex = 0; visualIndex < totalTiles; visualIndex++)
         {
             int row = visualIndex / columns;
             int col = visualIndex % columns;
 
-            // ï¿½Xï¿½lï¿½Cï¿½Nï¿½ÏŠï¿½: ï¿½ï”ï¿½sï¿½Íuï¿½Eï¿½ï¿½ï¿½ï¿½ï¿½vï¿½È‚Ì‚Å˜_ï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½fï¿½bï¿½Nï¿½Xï¿½ï¿½ï¿½vï¿½Zï¿½ï¿½ï¿½ÄŽæ“¾
+            // ƒXƒlƒCƒN•ÏŠ·: Šï”s‚Íu‰E¨¶v‚È‚Ì‚Å˜_—ƒCƒ“ƒfƒbƒNƒX‚ðŒvŽZ‚µ‚ÄŽæ“¾
             int logicalIndex = (row % 2 == 0) ? visualIndex : (row * columns) + (columns - 1 - col);
 
             GameObject t = Instantiate(tilePrefab, boardParent);
@@ -115,7 +115,7 @@ public class BoardManager : MonoBehaviour
         }
     }
 
-    // ï¿½vï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½[ï¿½Ì‹ï¿½ï¿½ï¿½Ú“ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    // ƒvƒŒƒCƒ„[‚Ì‹î‚ðˆÚ“®‚³‚¹‚é
     public void MovePlayerPiece(int logicalIndex)
     {
         if (boardParent.childCount <= logicalIndex) return;
