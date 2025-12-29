@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
@@ -8,27 +7,25 @@ public class BoardManager : MonoBehaviour
     [Header("--- Map Settings ---")]
     public GameObject tilePrefab;
     public Transform boardParent;
-    public Transform playerPiece;
     public int totalTiles = 48;
 
-    // 外部から現在のマップ情報を参照するためのプロパティ
+    [Header("--- Player Settings ---")]
+    public GameObject playerPrefab;
+    public Transform playerPiece;
+
     public string[] BoardLayout { get; private set; }
 
-    // 初期化処理
     public void InitializeBoard(int currentGrade)
     {
-        // 既存のマスの削除
+        // 古いマス削除
         foreach (Transform child in boardParent) Destroy(child.gameObject);
 
         BoardLayout = new string[totalTiles];
 
-        // 1. 固定マスの配置
-        // ★修正: 1年生の時だけ0番をStartにする。それ以外はNormal（通過点）
+        // 1. 固定マス
         BoardLayout[0] = (currentGrade == 1) ? "Start" : "Normal";
+        BoardLayout[24] = "Middle";
 
-        BoardLayout[24] = "Middle"; // 中間地点
-
-        // 学年ごとのゴール・ショップ配置
         if (currentGrade == 3)
         {
             BoardLayout[totalTiles - 1] = "Goal";
@@ -39,67 +36,69 @@ public class BoardManager : MonoBehaviour
             BoardLayout[totalTiles - 1] = "Shop";
         }
 
-        // 教室マスの配置 (2年生以上)
+        // 教室
         if (currentGrade >= 2)
         {
             int[] cIdx = { 5, 13, 21, 29, 37, 45 };
             foreach (int i in cIdx)
-            {
                 if (i < totalTiles && string.IsNullOrEmpty(BoardLayout[i]))
                     BoardLayout[i] = "Classroom";
-            }
         }
 
-        // 2. ランダムマスの配置
-        List<string> p = new List<string>();
-
+        // 2. ランダムマス
+        List<string> randomTiles = new List<string>();
         if (currentGrade == 1)
         {
-            AddTiles(p, "Shop", 1);
-            AddTiles(p, "Male", 12); AddTiles(p, "Event", 12);
-            AddTiles(p, "FriendPlus", 8); AddTiles(p, "GPPlus", 6);
-            AddTiles(p, "GPMinus", 4); AddTiles(p, "FriendMinus", 2);
+            AddTiles(randomTiles, "Shop", 1);
+            AddTiles(randomTiles, "Male", 12); AddTiles(randomTiles, "Event", 12);
+            AddTiles(randomTiles, "FriendPlus", 8); AddTiles(randomTiles, "GPPlus", 6);
+            AddTiles(randomTiles, "GPMinus", 4); AddTiles(randomTiles, "FriendMinus", 2);
         }
         else
         {
-            // 2,3年生用バランス
-            if (currentGrade == 2) AddTiles(p, "Shop", 1);
-            AddTiles(p, "GPPlus", 10); AddTiles(p, "FriendPlus", 8);
-            AddTiles(p, "Event", 12); AddTiles(p, "GPMinus", 4);
-            AddTiles(p, "Male", 3); AddTiles(p, "FriendMinus", 2);
+            if (currentGrade == 2) AddTiles(randomTiles, "Shop", 1);
+            AddTiles(randomTiles, "GPPlus", 10); AddTiles(randomTiles, "FriendPlus", 8);
+            AddTiles(randomTiles, "Event", 12); AddTiles(randomTiles, "GPMinus", 4);
+            AddTiles(randomTiles, "Male", 3); AddTiles(randomTiles, "FriendMinus", 2);
         }
 
-        // シャッフル
-        p = p.OrderBy(x => Random.value).ToList();
+        randomTiles = randomTiles.OrderBy(x => Random.value).ToList();
 
-        // 空きマスに埋める
         int pIdx = 0;
         for (int i = 0; i < totalTiles; i++)
         {
             if (string.IsNullOrEmpty(BoardLayout[i]))
             {
-                BoardLayout[i] = (pIdx < p.Count) ? p[pIdx++] : "Normal";
+                BoardLayout[i] = (pIdx < randomTiles.Count) ? randomTiles[pIdx++] : "Normal";
             }
         }
 
-        // 3. 視覚的な生成（スネイク配置）
+        // 3. プレイヤー生成
+        if (playerPiece == null && playerPrefab != null)
+        {
+            GameObject pObj = Instantiate(playerPrefab);
+            pObj.name = "PlayerPiece";
+            playerPiece = pObj.transform;
+            // 必要ならCanvas内に入れる等の処理が必要だが、今回はWorld座標移動前提とする
+            // Canvas上で動かす場合は boardParent の子にするのも手
+            // playerPiece.SetParent(boardParent, false); 
+        }
+
+        // 4. マス生成
         GenerateVisualTiles();
     }
 
-    void AddTiles(List<string> list, string type, int count)
-    {
-        for (int i = 0; i < count; i++) list.Add(type);
-    }
+    void AddTiles(List<string> list, string type, int count) { for (int i = 0; i < count; i++) list.Add(type); }
 
     void GenerateVisualTiles()
     {
-        int columns = 8; // 1行8マス
+        int columns = 8;
         for (int visualIndex = 0; visualIndex < totalTiles; visualIndex++)
         {
             int row = visualIndex / columns;
             int col = visualIndex % columns;
 
-            // スネイク変換: 奇数行は「右→左」なので論理インデックスを計算して取得
+            // スネイク: 偶数はそのまま、奇数は反転
             int logicalIndex = (row % 2 == 0) ? visualIndex : (row * columns) + (columns - 1 - col);
 
             GameObject t = Instantiate(tilePrefab, boardParent);
@@ -115,30 +114,19 @@ public class BoardManager : MonoBehaviour
         }
     }
 
-    // プレイヤーの駒を移動させる
     public void MovePlayerPiece(int logicalIndex)
     {
-        if (boardParent.childCount <= logicalIndex) return;
+        if (boardParent.childCount <= logicalIndex || playerPiece == null) return;
 
         int columns = 8;
         int row = logicalIndex / columns;
         int col = logicalIndex % columns;
-        int visualIndex;
-
-        if (row % 2 == 0)
-        {
-            visualIndex = logicalIndex;
-        }
-        else
-        {
-            int rowStart = row * columns;
-            visualIndex = rowStart + (columns - 1 - col);
-        }
+        // 論理IDから視覚ID(子要素順)へ変換
+        int visualIndex = (row % 2 == 0) ? logicalIndex : (row * columns) + (columns - 1 - col);
 
         if (visualIndex >= 0 && visualIndex < boardParent.childCount)
         {
-            if (playerPiece != null)
-                playerPiece.position = boardParent.GetChild(visualIndex).position;
+            playerPiece.position = boardParent.GetChild(visualIndex).position;
         }
     }
 

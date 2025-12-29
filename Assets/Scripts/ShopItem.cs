@@ -11,7 +11,7 @@ public class ShopItem
     public ShopItem(string name, int price, string desc, Action onBuyAction)
     {
         itemName = name;
-        this.price = price; // âøäiîΩâfÉoÉOèCê≥çœÇ›
+        this.price = price;
         description = desc;
         onBuy = onBuyAction;
     }

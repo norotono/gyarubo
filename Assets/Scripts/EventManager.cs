@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -7,145 +6,98 @@ using UnityEngine.Events;
 
 public class EventManager : MonoBehaviour
 {
-    [Header("--- Event UI References ---")]
-    public GameObject eventSelectionPanel;
-    public TextMeshProUGUI eventTitleText;
+    [Header("--- Event UI ---")]
+    public GameObject eventPanel;
+    public TextMeshProUGUI titleText;
+    public Button[] options;      // InspectorでSize=3にしてボタンを登録
+    public TextMeshProUGUI[] optionTexts; // InspectorでSize=3にしてテキストを登録
 
-    public Button btnOption1;
-    public Button btnOption2;
-    public Button btnOption3;
-
-    public TextMeshProUGUI txtOption1;
-    public TextMeshProUGUI txtOption2;
-    public TextMeshProUGUI txtOption3;
-
-    [Header("--- Roulette UI References ---")]
+    [Header("--- Roulette UI ---")]
     public GameObject roulettePanel;
     public TextMeshProUGUI rouletteText;
 
-    // 選択肢パネルを表示する
-    // actionsにはボタン1, 2, 3が押されたときの処理（Action）を渡す
-    public void ShowChoicePanel(string title, string[] labels, UnityAction[] actions)
+    public void ShowChoices(string title, string[] labels, UnityAction[] actions, bool[] interactable = null)
     {
-        if (eventSelectionPanel) eventSelectionPanel.SetActive(true);
-        if (eventTitleText) eventTitleText.text = title;
+        // 安全策: パネルを表示
+        if (eventPanel) eventPanel.SetActive(true);
+        if (titleText) titleText.text = title;
 
-        // ボタン1設定
-        SetupButton(btnOption1, txtOption1, labels, actions, 0);
-        // ボタン2設定
-        SetupButton(btnOption2, txtOption2, labels, actions, 1);
-        // ボタン3設定
-        SetupButton(btnOption3, txtOption3, labels, actions, 2);
-    }
+        // 配列の安全チェック
+        int maxLen = (options != null) ? options.Length : 0;
 
-    void SetupButton(Button btn, TextMeshProUGUI txt, string[] labels, UnityAction[] actions, int index)
-    {
-        if (btn == null) return;
-
-        btn.onClick.RemoveAllListeners();
-
-        if (index < labels.Length && !string.IsNullOrEmpty(labels[index]))
+        for (int i = 0; i < maxLen; i++)
         {
-            btn.gameObject.SetActive(true);
-            btn.interactable = true; // 初期化
-            if (txt) txt.text = labels[index];
+            if (options[i] == null) continue;
 
-            if (index < actions.Length && actions[index] != null)
+            if (i < labels.Length)
             {
-                btn.onClick.AddListener(() => {
-                    ClosePanel();
-                    actions[index].Invoke();
+                options[i].gameObject.SetActive(true);
+
+                // テキスト設定
+                if (optionTexts != null && i < optionTexts.Length && optionTexts[i] != null)
+                {
+                    optionTexts[i].text = labels[i];
+                }
+
+                // ボタン有効無効
+                bool canPush = (interactable != null && i < interactable.Length) ? interactable[i] : true;
+                options[i].interactable = canPush;
+
+                // クリック処理設定
+                options[i].onClick.RemoveAllListeners();
+                int idx = i; // ローカル変数キャプチャ
+                options[i].onClick.AddListener(() => {
+                    ClosePanel(); // 押したら閉じる
+                    if (actions != null && idx < actions.Length && actions[idx] != null)
+                    {
+                        actions[idx].Invoke();
+                    }
                 });
             }
             else
             {
-                // アクションがない場合は閉じるだけ
-                btn.onClick.AddListener(ClosePanel);
+                options[i].gameObject.SetActive(false);
             }
-        }
-        else
-        {
-            // ラベルがない場合は非表示
-            btn.gameObject.SetActive(false);
         }
     }
 
     public void ClosePanel()
     {
-        if (eventSelectionPanel) eventSelectionPanel.SetActive(false);
+        if (eventPanel) eventPanel.SetActive(false);
     }
 
-    // 特定のボタンのInteractableを変更する（同伴可否などで使用）
-    public void SetButtonInteractable(int buttonIndex, bool interactable)
-    {
-        if (buttonIndex == 0 && btnOption1) btnOption1.interactable = interactable;
-        if (buttonIndex == 1 && btnOption2) btnOption2.interactable = interactable;
-        if (buttonIndex == 2 && btnOption3) btnOption3.interactable = interactable;
-    }
-
-    // ルーレット演出
-    public IEnumerator PlayRoulette(PlayerStats stats, bool hasBadEventProtection)
+    public IEnumerator PlayRoulette(PlayerStats stats, bool protection)
     {
         if (roulettePanel) roulettePanel.SetActive(true);
-        string[] visualResults = { "友達+", "GP+", "GP-", "友達-", "ステUP" };
+        string[] texts = { "友+", "GP+", "GP-", "友-", "LvUP" };
 
-        float timer = 0f;
-        while (timer < 1.5f)
+        float t = 0;
+        while (t < 1.0f)
         {
-            if (rouletteText) rouletteText.text = visualResults[Random.Range(0, visualResults.Length)];
+            if (rouletteText) rouletteText.text = texts[Random.Range(0, texts.Length)];
             yield return new WaitForSeconds(0.1f);
-            timer += 0.1f;
+            t += 0.1f;
         }
 
-        // 内部判定
-        int roll = Random.Range(0, 100);
-        string resultMsg = "";
+        int r = Random.Range(0, 100);
+        string msg = "";
 
-        if (roll < 30)
+        if (r < 30) { stats.friends++; msg = "友達ゲット！"; }
+        else if (r < 55) { stats.gp += 300; msg = "GPゲット！"; }
+        else if (r < 80)
         {
-            stats.friends += 1;
-            resultMsg = "友達ゲット！";
+            if (protection) { stats.gp += 100; msg = "親友効果: GP+100"; }
+            else { stats.gp = Mathf.Max(0, stats.gp - 200); msg = "GP減少..."; }
         }
-        else if (roll < 55)
+        else if (r < 95)
         {
-            stats.gp += 300;
-            resultMsg = "GPゲット！";
+            if (protection) { stats.gp += 100; msg = "親友効果: GP+100"; }
+            else { if (stats.friends > 0) stats.friends--; msg = "友達減少..."; }
         }
-        else if (roll < 80)
-        {
-            if (hasBadEventProtection)
-            {
-                stats.gp += 100;
-                resultMsg = "親友効果: GP+100";
-            }
-            else
-            {
-                stats.gp = Mathf.Max(0, stats.gp - 200);
-                resultMsg = "GP減少...";
-            }
-        }
-        else if (roll < 95)
-        {
-            if (hasBadEventProtection)
-            {
-                stats.gp += 100;
-                resultMsg = "親友効果: GP+100";
-            }
-            else
-            {
-                if (stats.friends > 0) stats.friends--;
-                resultMsg = "友達減少...";
-            }
-        }
-        else
-        {
-            stats.commuLv++;
-            resultMsg = "ステータスUP!";
-        }
+        else { stats.commuLv++; msg = "ステータスUP!"; }
 
-        if (rouletteText) rouletteText.text = resultMsg;
+        if (rouletteText) rouletteText.text = msg;
         yield return new WaitForSeconds(1.5f);
-
         if (roulettePanel) roulettePanel.SetActive(false);
     }
 }
