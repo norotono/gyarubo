@@ -4,90 +4,129 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-// ★ここに書いてあった ShopItem クラスの定義は削除しました（ShopItem.csを使うため）
-
 public class ShopManager : MonoBehaviour
 {
-    [Header("--- Shop UI ---")]
+    [Header("--- Shop UI References ---")]
     public GameObject shopPanel;
     public Transform shopContent;
     public GameObject shopItemPrefab;
     public TextMeshProUGUI shopInfoText;
     public GameObject shopCloseButton;
 
+    // 内部ステート
     private List<ShopItem> shopItems = new List<ShopItem>();
     public bool IsShopOpen { get; private set; } = false;
 
-    public void SetupItems(int grade)
+    // ボタン制御用クラス
+    private class ActiveShopButton
+    {
+        public Button button;
+        public int price;
+    }
+    private List<ActiveShopButton> currentShopButtons = new List<ActiveShopButton>();
+
+    // 外部（GameManager）からアイテム定義を初期化
+    public void InitializeShopItems(int grade, PlayerStats stats)
     {
         shopItems.Clear();
-        PlayerStats s = PlayerStats.Instance;
-
-        // アイテム定義
-        shopItems.Add(new ShopItem("生徒手帳", 200, "教室用", () => s.studentIdCount++));
-        shopItems.Add(new ShopItem("移動カード", 150, "ランダム", () => s.moveCards.Add(Random.Range(1, 7))));
-        shopItems.Add(new ShopItem("ステUP", 1500, "Lv+1", () => s.commuLv++));
+        shopItems.Add(new ShopItem("生徒手帳", 200, "教室用", () => stats.studentIdCount++));
+        shopItems.Add(new ShopItem("移動カード", 150, "ランダム", () => stats.moveCards.Add(Random.Range(1, 7))));
+        shopItems.Add(new ShopItem("プレゼント", 500, "親密度UP", () => stats.present++));
+        shopItems.Add(new ShopItem("イベント強制", 800, "マス無視", () => stats.eventForce++));
+        shopItems.Add(new ShopItem("ステータスUP", 1500, "Lv+1", () => stats.commuLv++));
 
         if (grade == 3)
         {
-            shopItems.Add(new ShopItem("卒業アルバム", 1000, "友+10", () => { s.friends += 10; s.albumPrice += 500; }));
+            shopItems.Add(new ShopItem("卒業写真", 100, "友+1", () => stats.friends++));
+            shopItems.Add(new ShopItem("卒業アルバム", 1000, "友+10", () => { stats.friends += 10; stats.albumPrice += 500; }));
         }
     }
 
-    public IEnumerator OpenShop(bool isDiscount)
+    // ショップを開く（コルーチンで待機できるようにする）
+    public IEnumerator OpenShopSequence(PlayerStats stats, bool isDiscount)
     {
         IsShopOpen = true;
         if (shopPanel) shopPanel.SetActive(true);
-        PlayerStats stats = PlayerStats.Instance;
 
-        UpdateUI(stats.gp, isDiscount);
+        UpdateInfoText(stats.gp, isDiscount);
         GenerateButtons(stats, isDiscount);
 
+        // 閉じるボタンの設定
         if (shopCloseButton)
         {
             shopCloseButton.GetComponent<Button>().onClick.RemoveAllListeners();
             shopCloseButton.GetComponent<Button>().onClick.AddListener(() => IsShopOpen = false);
         }
 
-        while (IsShopOpen) yield return null;
+        // 閉じるまで待機
+        while (IsShopOpen)
+        {
+            yield return null;
+        }
 
         if (shopPanel) shopPanel.SetActive(false);
     }
 
-    void UpdateUI(int gp, bool discount)
+    void UpdateInfoText(int currentGp, bool isDiscount)
     {
-        if (shopInfoText)
+        if (shopInfoText != null)
         {
-            string msg = discount ? "<color=red>20% OFF!</color>" : "いらっしゃいませ";
-            shopInfoText.text = $"{msg}\n所持金: {gp:N0} GP";
+            string msg = isDiscount ? "<color=red>全品 20% OFF!</color>" : "いらっしゃいませ";
+            shopInfoText.text = $"{msg}\n所持金: {currentGp:N0} GP";
         }
     }
 
-    void GenerateButtons(PlayerStats stats, bool discount)
+    void GenerateButtons(PlayerStats stats, bool isDiscount)
     {
         foreach (Transform child in shopContent) Destroy(child.gameObject);
+        currentShopButtons.Clear();
 
         foreach (var item in shopItems)
         {
-            GameObject obj = Instantiate(shopItemPrefab, shopContent);
-            int price = discount ? (int)(item.price * 0.8f) : item.price;
+            GameObject btnObj = Instantiate(shopItemPrefab, shopContent);
 
-            var txt = obj.GetComponentInChildren<TextMeshProUGUI>();
-            if (txt) txt.text = $"{item.itemName}\n{price} GP";
+            // 価格計算（この場限りの計算）
+            int finalPrice = isDiscount ? (int)(item.price * 0.8f) : item.price;
 
-            Button btn = obj.GetComponent<Button>();
-            btn.onClick.AddListener(() =>
+            // 表示更新
+            TextMeshProUGUI txt = btnObj.GetComponentInChildren<TextMeshProUGUI>();
+            if (txt)
             {
-                if (stats.gp >= price)
+                txt.text = $"{item.itemName}\n<size=80%>{finalPrice} GP</size>";
+            }
+
+            Button btn = btnObj.GetComponent<Button>();
+
+            // リスト登録
+            currentShopButtons.Add(new ActiveShopButton { button = btn, price = finalPrice });
+
+            // クリックイベント
+            btn.onClick.AddListener(() => {
+                if (stats.gp >= finalPrice)
                 {
-                    stats.gp -= price;
+                    stats.gp -= finalPrice;
                     item.onBuy.Invoke();
-                    UpdateUI(stats.gp, discount);
-                    GenerateButtons(stats, discount); // ボタン状態更新のため再描画
+                    Debug.Log($"購入: {item.itemName}");
+
+                    // UI更新
+                    UpdateInfoText(stats.gp, isDiscount);
+                    RefreshButtons(stats.gp);
                 }
             });
-            // 所持金不足なら押せないようにする
-            btn.interactable = (stats.gp >= price);
+        }
+        // 初期状態のボタン有効無効チェック
+        RefreshButtons(stats.gp);
+    }
+
+    // 所持金に応じてボタンの有効/無効を更新
+    public void RefreshButtons(int currentGp)
+    {
+        foreach (var btnData in currentShopButtons)
+        {
+            if (btnData.button != null)
+            {
+                btnData.button.interactable = (currentGp >= btnData.price);
+            }
         }
     }
 }

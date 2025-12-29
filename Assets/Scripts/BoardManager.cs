@@ -1,3 +1,4 @@
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
@@ -7,25 +8,27 @@ public class BoardManager : MonoBehaviour
     [Header("--- Map Settings ---")]
     public GameObject tilePrefab;
     public Transform boardParent;
+    public Transform playerPiece;
     public int totalTiles = 48;
 
-    [Header("--- Player Settings ---")]
-    public GameObject playerPrefab;
-    public Transform playerPiece;
-
+    // ï¿½Oï¿½ï¿½ï¿½ï¿½ï¿½çŒ»ï¿½Ý‚Ìƒ}ï¿½bï¿½vï¿½ï¿½ï¿½ï¿½ï¿½Qï¿½Æ‚ï¿½ï¿½é‚½ï¿½ß‚Ìƒvï¿½ï¿½ï¿½pï¿½eï¿½B
     public string[] BoardLayout { get; private set; }
 
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     public void InitializeBoard(int currentGrade)
     {
-        // ŒÃ‚¢ƒ}ƒXíœ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ìƒ}ï¿½Xï¿½Ìíœ
         foreach (Transform child in boardParent) Destroy(child.gameObject);
 
         BoardLayout = new string[totalTiles];
 
-        // 1. ŒÅ’èƒ}ƒX
+        // 1. ï¿½Å’ï¿½}ï¿½Xï¿½Ì”zï¿½u
+        // ï¿½ï¿½ï¿½Cï¿½ï¿½: 1ï¿½Nï¿½ï¿½ï¿½ÌŽï¿½ï¿½ï¿½ï¿½ï¿½0ï¿½Ô‚ï¿½Startï¿½É‚ï¿½ï¿½ï¿½Bï¿½ï¿½ï¿½ï¿½ÈŠOï¿½ï¿½Normalï¿½iï¿½Ê‰ß“_ï¿½j
         BoardLayout[0] = (currentGrade == 1) ? "Start" : "Normal";
-        BoardLayout[24] = "Middle";
 
+        BoardLayout[24] = "Middle"; // ï¿½ï¿½ï¿½Ô’nï¿½_
+
+        // ï¿½wï¿½Nï¿½ï¿½ï¿½Æ‚ÌƒSï¿½[ï¿½ï¿½ï¿½Eï¿½Vï¿½ï¿½ï¿½bï¿½vï¿½zï¿½u
         if (currentGrade == 3)
         {
             BoardLayout[totalTiles - 1] = "Goal";
@@ -36,69 +39,67 @@ public class BoardManager : MonoBehaviour
             BoardLayout[totalTiles - 1] = "Shop";
         }
 
-        // ‹³Žº
+        // ï¿½ï¿½ï¿½ï¿½ï¿½}ï¿½Xï¿½Ì”zï¿½u (2ï¿½Nï¿½ï¿½ï¿½Èï¿½)
         if (currentGrade >= 2)
         {
             int[] cIdx = { 5, 13, 21, 29, 37, 45 };
             foreach (int i in cIdx)
+            {
                 if (i < totalTiles && string.IsNullOrEmpty(BoardLayout[i]))
                     BoardLayout[i] = "Classroom";
+            }
         }
 
-        // 2. ƒ‰ƒ“ƒ_ƒ€ƒ}ƒX
-        List<string> randomTiles = new List<string>();
+        // 2. ï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½ï¿½ï¿½}ï¿½Xï¿½Ì”zï¿½u
+        List<string> p = new List<string>();
+
         if (currentGrade == 1)
         {
-            AddTiles(randomTiles, "Shop", 1);
-            AddTiles(randomTiles, "Male", 12); AddTiles(randomTiles, "Event", 12);
-            AddTiles(randomTiles, "FriendPlus", 8); AddTiles(randomTiles, "GPPlus", 6);
-            AddTiles(randomTiles, "GPMinus", 4); AddTiles(randomTiles, "FriendMinus", 2);
+            AddTiles(p, "Shop", 1);
+            AddTiles(p, "Male", 12); AddTiles(p, "Event", 12);
+            AddTiles(p, "FriendPlus", 8); AddTiles(p, "GPPlus", 6);
+            AddTiles(p, "GPMinus", 4); AddTiles(p, "FriendMinus", 2);
         }
         else
         {
-            if (currentGrade == 2) AddTiles(randomTiles, "Shop", 1);
-            AddTiles(randomTiles, "GPPlus", 10); AddTiles(randomTiles, "FriendPlus", 8);
-            AddTiles(randomTiles, "Event", 12); AddTiles(randomTiles, "GPMinus", 4);
-            AddTiles(randomTiles, "Male", 3); AddTiles(randomTiles, "FriendMinus", 2);
+            // 2,3ï¿½Nï¿½ï¿½ï¿½pï¿½oï¿½ï¿½ï¿½ï¿½ï¿½X
+            if (currentGrade == 2) AddTiles(p, "Shop", 1);
+            AddTiles(p, "GPPlus", 10); AddTiles(p, "FriendPlus", 8);
+            AddTiles(p, "Event", 12); AddTiles(p, "GPMinus", 4);
+            AddTiles(p, "Male", 3); AddTiles(p, "FriendMinus", 2);
         }
 
-        randomTiles = randomTiles.OrderBy(x => Random.value).ToList();
+        // ï¿½Vï¿½ï¿½ï¿½bï¿½tï¿½ï¿½
+        p = p.OrderBy(x => Random.value).ToList();
 
+        // ï¿½ó‚«ƒ}ï¿½Xï¿½É–ï¿½ï¿½ß‚ï¿½
         int pIdx = 0;
         for (int i = 0; i < totalTiles; i++)
         {
             if (string.IsNullOrEmpty(BoardLayout[i]))
             {
-                BoardLayout[i] = (pIdx < randomTiles.Count) ? randomTiles[pIdx++] : "Normal";
+                BoardLayout[i] = (pIdx < p.Count) ? p[pIdx++] : "Normal";
             }
         }
 
-        // 3. ƒvƒŒƒCƒ„[¶¬
-        if (playerPiece == null && playerPrefab != null)
-        {
-            GameObject pObj = Instantiate(playerPrefab);
-            pObj.name = "PlayerPiece";
-            playerPiece = pObj.transform;
-            // •K—v‚È‚çCanvas“à‚É“ü‚ê‚é“™‚Ìˆ—‚ª•K—v‚¾‚ªA¡‰ñ‚ÍWorldÀ•WˆÚ“®‘O’ñ‚Æ‚·‚é
-            // Canvasã‚Å“®‚©‚·ê‡‚Í boardParent ‚ÌŽq‚É‚·‚é‚Ì‚àŽè
-            // playerPiece.SetParent(boardParent, false); 
-        }
-
-        // 4. ƒ}ƒX¶¬
+        // 3. ï¿½ï¿½ï¿½oï¿½Iï¿½Èï¿½ï¿½ï¿½ï¿½iï¿½Xï¿½lï¿½Cï¿½Nï¿½zï¿½uï¿½j
         GenerateVisualTiles();
     }
 
-    void AddTiles(List<string> list, string type, int count) { for (int i = 0; i < count; i++) list.Add(type); }
+    void AddTiles(List<string> list, string type, int count)
+    {
+        for (int i = 0; i < count; i++) list.Add(type);
+    }
 
     void GenerateVisualTiles()
     {
-        int columns = 8;
+        int columns = 8; // 1ï¿½s8ï¿½}ï¿½X
         for (int visualIndex = 0; visualIndex < totalTiles; visualIndex++)
         {
             int row = visualIndex / columns;
             int col = visualIndex % columns;
 
-            // ƒXƒlƒCƒN: ‹ô”‚Í‚»‚Ì‚Ü‚ÜAŠï”‚Í”½“]
+            // ï¿½Xï¿½lï¿½Cï¿½Nï¿½ÏŠï¿½: ï¿½ï”ï¿½sï¿½Íuï¿½Eï¿½ï¿½ï¿½ï¿½ï¿½vï¿½È‚Ì‚Å˜_ï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½fï¿½bï¿½Nï¿½Xï¿½ï¿½ï¿½vï¿½Zï¿½ï¿½ï¿½ÄŽæ“¾
             int logicalIndex = (row % 2 == 0) ? visualIndex : (row * columns) + (columns - 1 - col);
 
             GameObject t = Instantiate(tilePrefab, boardParent);
@@ -114,19 +115,30 @@ public class BoardManager : MonoBehaviour
         }
     }
 
+    // ï¿½vï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½[ï¿½Ì‹ï¿½ï¿½ï¿½Ú“ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     public void MovePlayerPiece(int logicalIndex)
     {
-        if (boardParent.childCount <= logicalIndex || playerPiece == null) return;
+        if (boardParent.childCount <= logicalIndex) return;
 
         int columns = 8;
         int row = logicalIndex / columns;
         int col = logicalIndex % columns;
-        // ˜_—ID‚©‚çŽ‹ŠoID(Žq—v‘f‡)‚Ö•ÏŠ·
-        int visualIndex = (row % 2 == 0) ? logicalIndex : (row * columns) + (columns - 1 - col);
+        int visualIndex;
+
+        if (row % 2 == 0)
+        {
+            visualIndex = logicalIndex;
+        }
+        else
+        {
+            int rowStart = row * columns;
+            visualIndex = rowStart + (columns - 1 - col);
+        }
 
         if (visualIndex >= 0 && visualIndex < boardParent.childCount)
         {
-            playerPiece.position = boardParent.GetChild(visualIndex).position;
+            if (playerPiece != null)
+                playerPiece.position = boardParent.GetChild(visualIndex).position;
         }
     }
 
