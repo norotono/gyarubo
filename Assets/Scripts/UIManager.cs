@@ -3,10 +3,13 @@ using TMPro;
 
 public class UIManager : MonoBehaviour
 {
+    [Header("--- HUD ---")]
     public TextMeshProUGUI dateText;
     public TextMeshProUGUI assetText;
     public TextMeshProUGUI statusText;
-    public PhoneUIManager phoneUI;
+
+    [Header("--- Phone ---")]
+    public PhoneUIManager phoneUI; // 必須: Inspectorでアタッチ
 
     public void UpdateDisplay(PlayerStats s)
     {
@@ -18,6 +21,14 @@ public class UIManager : MonoBehaviour
     public void Log(string msg)
     {
         Debug.Log(msg);
-        if (phoneUI) phoneUI.AddLog(msg);
+        // スマホのログ機能へ送る
+        if (phoneUI)
+        {
+            phoneUI.AddLog(msg);
+        }
+        else
+        {
+            Debug.LogWarning("PhoneUIManagerがUIManagerにアタッチされていません！");
+        }
     }
 }

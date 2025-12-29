@@ -3716,8 +3716,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2499cb2e29d14774cbd2c984a90539f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EventManager
-  eventPanel: {fileID: 1390074610}
-  titleText: {fileID: 1690331190}
+  eventPanel: {fileID: 2095053853}
+  titleText: {fileID: 134969112}
   options:
   - {fileID: 1917496578}
   - {fileID: 463015013}
