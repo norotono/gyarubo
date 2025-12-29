@@ -61,9 +61,18 @@ public class EventManager : MonoBehaviour
         }
     }
 
-    public void ClosePanel()
+    // ▼ 既存の「閉じるボタン」用の関数（名前は CloseEventPanel などになっているはずです）
+    public void OnClickCloseEventPanel()
     {
-        if (eventPanel) eventPanel.SetActive(false);
+        // 1. パネルを非表示にする（これが抜けているか、エラーで止まっている可能性があります）
+        if (eventPanel != null)
+        {
+            eventPanel.SetActive(false);
+        }
+
+        // 2. 次の処理へ進む（ターン終了など）
+        // ※ここでGameManagerのターン終了処理を呼びます
+        GameManager.Instance.EndTurn();
     }
 
     public IEnumerator PlayRoulette(PlayerStats stats, bool protection)
