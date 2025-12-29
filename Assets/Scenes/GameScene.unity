@@ -244,7 +244,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &11151865
@@ -501,7 +501,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &75877374
@@ -1819,7 +1819,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &550793649
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2793,7 +2793,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &837408507
@@ -3220,7 +3220,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &960329313
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3581,7 +3581,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &1064121717
@@ -3603,7 +3603,10 @@ GameObject:
   - component: {fileID: 1207487382}
   - component: {fileID: 1207487384}
   - component: {fileID: 1207487383}
+  - component: {fileID: 1207487388}
+  - component: {fileID: 1207487387}
   - component: {fileID: 1207487385}
+  - component: {fileID: 1207487386}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -3660,11 +3663,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7bd236c197f843146937b685f481d610, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
+  boardManager: {fileID: 0}
+  shopManager: {fileID: 0}
+  eventManager: {fileID: 0}
   currentGrade: 1
   moveSpeed: 0.3
   playerStats: {fileID: 1207487385}
   phoneUI: {fileID: 1207487383}
-  playerPiece: {fileID: 657455302}
   diceButton: {fileID: 526274553}
   diceImage: {fileID: 1025141901}
   diceSprites:
@@ -3677,24 +3682,6 @@ MonoBehaviour:
   dateText: {fileID: 1237643064}
   assetText: {fileID: 1925333483}
   statusText: {fileID: 893163863}
-  eventSelectionPanel: {fileID: 960329312}
-  eventTitleText: {fileID: 1064121716}
-  btnOption1: {fileID: 1917496578}
-  btnOption2: {fileID: 463015013}
-  btnOption3: {fileID: 898555354}
-  txtOption1: {fileID: 837408506}
-  txtOption2: {fileID: 11151864}
-  txtOption3: {fileID: 75877373}
-  shopPanel: {fileID: 1516870265}
-  shopContent: {fileID: 1384557890}
-  shopItemPrefab: {fileID: 1982980440097699402, guid: ef48f334a63bf1a4f979548a32897995, type: 3}
-  shopInfoText: {fileID: 1458353066}
-  shopCloseButton: {fileID: 1780858673}
-  roulettePanel: {fileID: 2095053853}
-  rouletteText: {fileID: 134969112}
-  tilePrefab: {fileID: 3251086776871228610, guid: aa569661ffba8b14fa0b8acf4e1287f6, type: 3}
-  boardParent: {fileID: 1511055850}
-  totalTiles: 48
   allFriends:
   - name: "\u30A2\u30A4"
     abilityDescription: " [\u80FD\u529B] \u52A0\u5165\u6642\u306B\u4E00\u5EA6\u3060\u3051\u3001\u73FE\u5728\u306E\u57FA\u790E\u30B9\u30B3\u30A2\uFF08\u53CB\u9054\u6570\uFF09\u30922\u500D\u306B\u3059\u308B\u3002"
@@ -3786,11 +3773,6 @@ MonoBehaviour:
   - 2-C
   - "\u7406\u79D1\u5BA4"
   - "\u7F8E\u8853\u5BA4"
-  floor3Rooms:
-  - 3-A
-  - 3-B
-  - "\u97F3\u697D\u5BA4"
-  - "\u8996\u8074\u899A\u5BA4"
 --- !u!114 &1207487385
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3826,6 +3808,61 @@ MonoBehaviour:
   shopSpentTotal: 0
   soloPlayConsecutive: 0
   totalSteps: 0
+--- !u!114 &1207487386
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1207487379}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2499cb2e29d14774cbd2c984a90539f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EventManager
+  eventSelectionPanel: {fileID: 0}
+  eventTitleText: {fileID: 0}
+  btnOption1: {fileID: 0}
+  btnOption2: {fileID: 0}
+  btnOption3: {fileID: 0}
+  txtOption1: {fileID: 0}
+  txtOption2: {fileID: 0}
+  txtOption3: {fileID: 0}
+  roulettePanel: {fileID: 0}
+  rouletteText: {fileID: 0}
+--- !u!114 &1207487387
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1207487379}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2bb440ac1b79867419afb539b6ba5fc7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BoardManager
+  tilePrefab: {fileID: 3251086776871228610, guid: aa569661ffba8b14fa0b8acf4e1287f6, type: 3}
+  boardParent: {fileID: 1511055850}
+  playerPiece: {fileID: 1390074611}
+  totalTiles: 48
+--- !u!114 &1207487388
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1207487379}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86c8a2eb403d1b64390008397174cf97, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShopManager
+  shopPanel: {fileID: 1516870265}
+  shopContent: {fileID: 1384557890}
+  shopItemPrefab: {fileID: 5160460161080527102, guid: 1254f0eedad6a644cb81f0d0022cca6b, type: 3}
+  shopInfoText: {fileID: 1458353066}
+  shopCloseButton: {fileID: 1780858673}
 --- !u!1 &1209836680
 GameObject:
   m_ObjectHideFlags: 0
