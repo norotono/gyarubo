@@ -14,32 +14,45 @@ public class PlayerStats : MonoBehaviour
     public int galLv = 1;
     public int lemonLv = 1;
 
-    [Header("Counters (For Friend Conditions)")]
-    public int maleContactCount = 0;    // 男子接触回数
-    public int gpPlusTileCount = 0;     // 幸福
-    public int gpMinusTileCount = 0;    // 不幸
-    public int diceOneCount = 0;        // ダイス1の回数
-    public int shopSpendTotal = 0;      // 浪費
-    public int totalSteps = 0;          // 歩数
-    public int soloPlayConsecutive = 0; // 孤独（今回は連続でなく累計なら要調整）
+    [Header("Time")]
+    public int currentGrade = 1;
+    public int currentMonth = 4;
 
-    // 卒業アルバム購入回数
+    [Header("Counters")]
+    public int maleContactCount = 0;
+    public int gpPlusTileCount = 0;
+    public int gpMinusTileCount = 0;
+    public int diceOneCount = 0;
+    public int shopSpendTotal = 0;
+    public int totalSteps = 0;
+    public int soloPlayConsecutive = 0;
+
     public int gradAlbumBuyCount = 0;
-
-    // ターン経過数 (リカの能力用)
     public int turnCount = 0;
 
     [Header("Inventory")]
-    public List<ItemData> moveCards = new List<ItemData>(); // 5枚制限
-    public List<ItemData> otherItems = new List<ItemData>(); // 無制限
+    public List<ItemData> moveCards = new List<ItemData>();
+    public List<ItemData> otherItems = new List<ItemData>();
 
     public const int MaxMoveCards = 5;
 
-    private void Awake() { if (Instance == null) Instance = this; }
+    private void Awake()
+    {
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+    }
 
-    // 給料計算等はそのまま...
+    public int CalculateSalary(int shinyuCount)
+    {
+        return 3000 + (shinyuCount * 1000) + (galLv * 500);
+    }
 
-    // アイテム削除用
+    // ★追加: 5枚制限チェック用メソッド
+    public bool IsMoveCardFull()
+    {
+        return moveCards.Count >= MaxMoveCards;
+    }
+
     public void RemoveItem(ItemData item)
     {
         if (moveCards.Contains(item)) moveCards.Remove(item);

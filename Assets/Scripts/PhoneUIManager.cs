@@ -26,17 +26,17 @@ public class PhoneUIManager : MonoBehaviour
     public GameObject listItemPrefab;
     public Transform listContentRoot;
 
-    // ダミーのItemData作成用（移動カード使用時）
-    // ScriptableObject.CreateInstanceを使うため参照不要ですが、枠組みとして
     private GameManager gameManager;
 
     public void Initialize(GameManager gm)
     {
         gameManager = gm;
-        btnFriend.onClick.AddListener(() => { OpenSubPanel(friendListPanel); RefreshFriendList(); });
-        btnItem.onClick.AddListener(() => { OpenSubPanel(itemListPanel); RefreshItemList(); });
-        btnInfo.onClick.AddListener(() => { OpenSubPanel(infoPanel); UpdateInfoText(); });
-        btnBoy.onClick.AddListener(() => AddLog("男子・彼氏機能は準備中です。"));
+        // 各ボタンに機能を割り当て
+        if (btnFriend) btnFriend.onClick.AddListener(() => { OpenSubPanel(friendListPanel); RefreshFriendList(); });
+        if (btnItem) btnItem.onClick.AddListener(() => { OpenSubPanel(itemListPanel); RefreshItemList(); });
+        if (btnInfo) btnInfo.onClick.AddListener(() => { OpenSubPanel(infoPanel); UpdateInfoText(); });
+        if (btnBoy) btnBoy.onClick.AddListener(() => AddLog("男子・彼氏機能は準備中です。"));
+
         CloseSubPanels();
     }
 
@@ -44,6 +44,7 @@ public class PhoneUIManager : MonoBehaviour
     {
         if (logText == null) return;
         logText.text = $"> {message}\n" + logText.text;
+        // 文字数制限
         if (logText.text.Length > 2000) logText.text = logText.text.Substring(0, 2000);
     }
 
@@ -67,8 +68,7 @@ public class PhoneUIManager : MonoBehaviour
         foreach (Transform child in listContentRoot) Destroy(child.gameObject);
     }
 
-    // --- リスト表示修正部分 ---
-
+    // --- 親友リスト表示 ---
     void RefreshFriendList()
     {
         ClearList();
@@ -81,40 +81,34 @@ public class PhoneUIManager : MonoBehaviour
                 GameObject obj = Instantiate(listItemPrefab, listContentRoot);
                 TextMeshProUGUI txt = obj.GetComponentInChildren<TextMeshProUGUI>();
                 txt.text = $"★ {friend.characterName}\n<size=70%>{friend.introduction}</size>";
-                obj.GetComponent<Button>().interactable = false;
+                obj.GetComponent<Button>().interactable = false; // 閲覧専用
             }
         }
         CreateCloseButton();
     }
 
+    // --- アイテムリスト表示 (修正箇所) ---
     void RefreshItemList()
     {
         ClearList();
         PlayerStats stats = PlayerStats.Instance;
 
-        // 1. 移動カードの表示
-        for (int i = 0; i < stats.moveCards.Count; i++)
+        // 1. 移動カード (List<ItemData> として処理)
+        foreach (var card in stats.moveCards)
         {
-            int steps = stats.moveCards[i];
             GameObject obj = Instantiate(listItemPrefab, listContentRoot);
             TextMeshProUGUI txt = obj.GetComponentInChildren<TextMeshProUGUI>();
-            txt.text = $"移動カード ({steps})";
+            txt.text = card.itemName; // データ名をそのまま表示
 
             Button btn = obj.GetComponent<Button>();
             btn.onClick.AddListener(() => {
-                // 移動カードを使用する処理
-                // ここで一時的なItemDataを作ってGameManagerに渡す
-                ItemData tempItem = ScriptableObject.CreateInstance<ItemData>();
-                tempItem.itemName = $"移動カード({steps})";
-                tempItem.itemType = ItemType.MoveCard;
-                tempItem.moveSteps = steps;
-
-                gameManager.UseItem(tempItem);
+                // アイテム使用
+                gameManager.UseItem(card);
                 CloseSubPanels();
             });
         }
 
-        // 2. その他のアイテムの表示
+        // 2. その他のアイテム
         foreach (var item in stats.otherItems)
         {
             GameObject obj = Instantiate(listItemPrefab, listContentRoot);
@@ -128,6 +122,7 @@ public class PhoneUIManager : MonoBehaviour
             });
         }
 
+        // 何も持っていない場合
         if (stats.moveCards.Count == 0 && stats.otherItems.Count == 0)
         {
             GameObject emptyObj = Instantiate(listItemPrefab, listContentRoot);
@@ -138,13 +133,16 @@ public class PhoneUIManager : MonoBehaviour
         CreateCloseButton();
     }
 
+    // --- ステータス情報表示 ---
     void UpdateInfoText()
     {
         PlayerStats s = PlayerStats.Instance;
         if (infoText)
         {
             infoText.text = $"現在: {s.currentGrade}年生 {s.currentMonth}月\n" +
-                            $"GP: {s.gp:N0}\n友達: {s.friends}人\n" +
+                            $"GP: {s.gp:N0}\n友達: {s.friends}人\n\n" +
+                            $"[ステータス]\n" +
+                            $"コミュ: {s.commuLv}  ギャル: {s.galLv}  レモン: {s.lemonLv}\n\n" +
                             $"移動カード所持: {s.moveCards.Count}/{PlayerStats.MaxMoveCards}";
         }
         CreateCloseButton();

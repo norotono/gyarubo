@@ -9,26 +9,27 @@ public class ShopManager : MonoBehaviour
     [Header("--- UI References ---")]
     public GameObject shopPanel;
     public Transform itemGridRoot;
-    public GameObject shopItemPrefab; // ShopItemスクリプトがついたボタンプレハブ
+    public GameObject shopItemPrefab;
     public TextMeshProUGUI playerGPText;
 
-    [Header("--- Discard UI (Over Limit) ---")]
+    [Header("--- Discard UI ---")]
     public GameObject discardPanel;
     public Transform discardGridRoot;
     public GameObject discardButtonPrefab;
     public TextMeshProUGUI discardMessageText;
 
     [Header("--- Shop Data ---")]
-    public List<ItemData> shopItemsData; // Inspectorで販売するアイテムを登録
+    public List<ItemData> shopItemsData; // ショップに並べる商品リスト
+
+    [Header("--- Database (New) ---")]
+    public List<ItemData> fixedMoveCards; // 実体化する移動カード(1)～(6)をここに登録
 
     private PlayerStats stats;
     private ItemData pendingPurchaseItem;
 
-    // ★追加: GameManagerから呼ばれる初期化用メソッド
+    // 初期化メソッド
     public void SetupItems(int grade)
     {
-        // 将来的に「3年生限定アイテム」などを追加する場合はここでリストを操作します。
-        // 現状はInspectorで設定したリストをそのまま使うため、処理は空でOKです。
         Debug.Log($"Shop initialized for Grade {grade}");
     }
 
@@ -42,7 +43,6 @@ public class ShopManager : MonoBehaviour
         UpdateGPDisplay();
         GenerateShopItems(isDiscount);
 
-        // 閉じるボタン等でパネルが非表示になるまで待機
         while (shopPanel != null && shopPanel.activeSelf)
         {
             yield return null;
@@ -51,41 +51,35 @@ public class ShopManager : MonoBehaviour
 
     void UpdateGPDisplay()
     {
-        if (stats && playerGPText)
-            playerGPText.text = $"所持金: {stats.gp:N0} GP";
+        if (stats && playerGPText) playerGPText.text = $"所持金: {stats.gp:N0} GP";
     }
 
-    // 商品一覧の生成
+    // 商品一覧生成
     void GenerateShopItems(bool isDiscount)
     {
-        // 既存のボタンをクリア
         foreach (Transform child in itemGridRoot) Destroy(child.gameObject);
 
         foreach (var data in shopItemsData)
         {
+            if (data.grade3Only && stats.currentGrade < 3) continue;
+
             GameObject obj = Instantiate(shopItemPrefab, itemGridRoot);
             ShopItem itemScript = obj.GetComponent<ShopItem>();
 
-            // --- 価格計算ロジック ---
             int finalPrice = data.basePrice;
 
-            // 移動カードの場合の価格変動 (Low:等倍, High:倍額)
-            if (data.itemType == ItemType.MoveCard)
+            // 割引適用
+            if (isDiscount) finalPrice = (int)(finalPrice * 0.8f);
+
+            // 倍額カード(HighLow)の表示価格
+            if (data.itemType == ItemType.MoveCard_HighLow) finalPrice = 400; // 固定400GP
+
+            // 変動価格(卒業アルバム)
+            if (data.itemType == ItemType.DynamicPrice)
             {
-                // 4マス以上進むカードは倍額
-                if (data.moveSteps >= 4)
-                {
-                    finalPrice *= 2;
-                }
+                finalPrice += (stats.gradAlbumBuyCount * data.priceIncrement);
             }
 
-            // 購買部の割引イベント (20% OFF)
-            if (isDiscount)
-            {
-                finalPrice = (int)(finalPrice * 0.8f);
-            }
-
-            // ボタン設定 (ShopItem.Setupを呼び出す)
             if (itemScript != null)
             {
                 itemScript.Setup(data, finalPrice, () => OnItemClicked(data, finalPrice));
@@ -93,8 +87,8 @@ public class ShopManager : MonoBehaviour
         }
     }
 
-    // 商品ボタンが押された時の処理
-    void OnItemClicked(ItemData item, int price)
+    // 購入ボタンクリック時 (ここが重要修正箇所)
+    void OnItemClicked(ItemData shopItem, int price)
     {
         if (stats.gp < price)
         {
@@ -102,46 +96,71 @@ public class ShopManager : MonoBehaviour
             return;
         }
 
-        // --- 移動カードの場合の特別処理 ---
-        if (item.itemType == ItemType.MoveCard)
+        // 購入しようとしているアイテムの実体を決定
+        ItemData actualItem = shopItem;
+
+        // ランダムカードなら、ここで中身(1~6)を抽選して入れ替える
+        if (shopItem.itemType == ItemType.MoveCard_RandomShop)
         {
-            if (stats.IsMoveCardFull())
+            if (fixedMoveCards == null || fixedMoveCards.Count < 6)
             {
-                // 上限オーバーなので、入れ替え処理へ
-                StartCoroutine(OpenDiscardMenu(item, price));
+                Debug.LogError("ShopManagerに Fixed Move Cards が登録されていません！Inspectorを確認してください。");
                 return;
             }
-            else
+            int roll = Random.Range(0, 6); // 0~5
+            actualItem = fixedMoveCards[roll];
+            Debug.Log($"ランダム抽選結果: {actualItem.itemName}");
+        }
+
+        // --- 所持チェック ---
+        bool isMoveCard = (actualItem.itemType == ItemType.MoveCard_Fixed ||
+                           actualItem.itemType == ItemType.MoveCard_HighLow);
+
+        if (isMoveCard)
+        {
+            // 5枚制限チェック
+            if (stats.moveCards.Count >= PlayerStats.MaxMoveCards)
             {
-                // 枠が空いていれば即購入
-                stats.gp -= price;
-                stats.AddMoveCard(item.moveSteps);
-                Debug.Log($"移動カード({item.moveSteps})を購入しました");
+                // 入れ替え画面を出す
+                StartCoroutine(OpenDiscardMenu(actualItem, price));
+                return;
             }
+            stats.moveCards.Add(actualItem);
         }
         else
         {
-            // その他のアイテム
-            stats.gp -= price;
-            stats.otherItems.Add(item);
-            Debug.Log($"{item.itemName}を購入しました");
+            stats.otherItems.Add(actualItem);
         }
 
+        // 購入完了処理
+        stats.gp -= price;
+        stats.shopSpendTotal += price;
         UpdateGPDisplay();
+
+        // ログ出し
+        if (shopItem.itemType == ItemType.MoveCard_RandomShop)
+        {
+            Debug.Log($"くじ結果: {actualItem.itemName} を入手しました！");
+        }
+
+        // 卒業アルバム等の価格変動があれば再描画
+        if (actualItem.itemType == ItemType.DynamicPrice)
+        {
+            GenerateShopItems(false);
+        }
     }
 
-    // 捨てるカードを選択するUIを表示
+    // 捨てるカード選択メニュー
     IEnumerator OpenDiscardMenu(ItemData newItem, int price)
     {
         pendingPurchaseItem = newItem;
         if (discardPanel) discardPanel.SetActive(true);
         if (discardMessageText)
-            discardMessageText.text = $"カードがいっぱいです。\n「移動{newItem.moveSteps}」を買うために\n捨てるカードを選んでください。";
+            discardMessageText.text = $"カードがいっぱいです。\n「{newItem.itemName}」を入手するために\n捨てるカードを選んでください。";
 
-        // 所持カード一覧を表示
         foreach (Transform child in discardGridRoot) Destroy(child.gameObject);
 
-        // 「購入をやめる」ボタン
+        // 購入をやめるボタン
         GameObject cancelBtn = Instantiate(discardButtonPrefab, discardGridRoot);
         cancelBtn.GetComponentInChildren<TextMeshProUGUI>().text = "購入をやめる";
         cancelBtn.GetComponent<Button>().onClick.AddListener(() => {
@@ -149,32 +168,26 @@ public class ShopManager : MonoBehaviour
             pendingPurchaseItem = null;
         });
 
-        // 所持カードボタン生成
+        // 所持カード一覧ボタン
         for (int i = 0; i < stats.moveCards.Count; i++)
         {
-            int cardValue = stats.moveCards[i];
-            int index = i; // キャプチャ用
+            ItemData card = stats.moveCards[i];
+            int index = i;
 
             GameObject btnObj = Instantiate(discardButtonPrefab, discardGridRoot);
-            btnObj.GetComponentInChildren<TextMeshProUGUI>().text = $"移動 {cardValue}";
+            btnObj.GetComponentInChildren<TextMeshProUGUI>().text = card.itemName;
 
-            // ボタンを押した時の処理（捨てて、新しいのを買って、閉じる）
             btnObj.GetComponent<Button>().onClick.AddListener(() => {
-                // 1. お金を払う
+                // 交換処理
                 stats.gp -= price;
+                stats.shopSpendTotal += price;
+                stats.moveCards.RemoveAt(index); // 捨てる
+                stats.moveCards.Add(newItem);    // 加える
 
-                // 2. 選んだカードを捨てる
-                stats.RemoveMoveCardAt(index);
-
-                // 3. 新しいカードを加える
-                stats.AddMoveCard(newItem.moveSteps);
-
-                // 4. 閉じる
                 if (discardPanel) discardPanel.SetActive(false);
                 UpdateGPDisplay();
             });
         }
-
         yield return null;
     }
 }
