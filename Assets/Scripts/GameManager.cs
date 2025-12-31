@@ -48,6 +48,8 @@ public class GameManager : MonoBehaviour
 
         // 1. 友達データの初期化
         InitializeFriends();
+        // ★追加: 最初はダイス画像を消しておく
+        if (diceImage != null) diceImage.gameObject.SetActive(false);
 
         // 2. マップ生成
         boardManager.InitializeBoard(currentGrade);
@@ -82,6 +84,8 @@ public class GameManager : MonoBehaviour
     {
         isMoving = true;
         diceButton.interactable = false;
+        // ★追加: 回す時だけ表示
+        if (diceImage != null) diceImage.gameObject.SetActive(true);
 
         float timer = 0f;
         while (timer < 0.5f)
@@ -335,22 +339,23 @@ public class GameManager : MonoBehaviour
 
     // 一人で遊ぶ時の判定（親友 -> ランダム）
     // 【変更】一人で遊ぶ（ルーレット演出付き）
+    // 【修正】GameManager.cs の CheckSoloEvent メソッド
     void CheckSoloEvent()
     {
-        // 親友確定条件のチェック（ここは確定なので演出なしで即出現でもOKだが、演出に組み込んでも良い）
+        // 1. 特殊条件親友の出現チェック
         FriendData newFriend = CheckSpecialConditionFriend();
-
         if (newFriend != null)
         {
-            // 条件を満たした親友がいる場合
             RecruitFriend(newFriend);
             EndTurn();
+            return;
         }
-        else
-        {
-            // ランダムイベント（ルーレット開始）
-            StartCoroutine(PlayRouletteSequence());
-        }
+
+        // 2. 該当者がいなければルーレット演出へ
+        bool hasProtection = HasFriendEffect(FriendEffectType.NullifyGPMinus) || HasFriendEffect(FriendEffectType.BadEventToGP);
+
+        // ★エラー修正: PlayRouletteSequence に名前を変更し、引数を合わせる
+        StartCoroutine(eventManager.PlayRouletteSequence(playerStats, currentGrade, hasProtection, EndTurn));
     }
 
     // 【追加】ルーレット演出のコルーチン
@@ -501,10 +506,15 @@ public class GameManager : MonoBehaviour
         eventManager.ShowChoicePanel("中間地点", labels, actions);
     }
 
+    // 【修正】古い呼び出し方になっていた部分を修正
     IEnumerator RunRoulette()
     {
         bool protection = HasFriendEffect(FriendEffectType.BadEventToGP);
-        yield return StartCoroutine(eventManager.PlayRoulette(playerStats, protection));
+
+        // エラー原因: 引数が足りていませんでした。
+        // 修正: (stats, grade, protection, callback) の4つを渡すように変更
+        yield return StartCoroutine(eventManager.PlayRouletteSequence(playerStats, currentGrade, protection, null));
+
         EndTurn();
     }
 
@@ -598,17 +608,17 @@ public class GameManager : MonoBehaviour
     // 【修正】GameManager.cs の InitializeFriends 関数
     void InitializeFriends()
     {
-        // 安全対策: リスト自体がない場合はエラーログを出して終了
+        // リスト設定チェック
         if (allFriends == null)
         {
             Debug.LogError("【Error】GameManagerの 'All Friends' リストが設定されていません！");
             return;
         }
 
-        // 1. 全員の状態をリセット (nullはスキップ)
+        // 1. 全員の状態をリセット
         foreach (var f in allFriends)
         {
-            if (f == null) continue; // ★ここが重要
+            if (f == null) continue;
             f.isRecruited = false;
             f.assignedCondition = ConditionType.None;
             f.assignedRoom = "";
@@ -617,19 +627,15 @@ public class GameManager : MonoBehaviour
 
         // 2. 「アイ」は特殊条件固定
         var ai = allFriends.FirstOrDefault(f => f != null && f.isAi);
-        if (ai != null)
-        {
-            ai.assignedCondition = ConditionType.Ai_Fixed;
-        }
+        if (ai != null) ai.assignedCondition = ConditionType.Ai_Fixed;
 
-        // 3. アイ以外のメンバーをシャッフル (nullを除外してリスト化)
+        // 3. アイ以外のメンバーをシャッフル
         var otherFriends = allFriends
             .Where(f => f != null && !f.isAi)
             .OrderBy(x => Random.value)
             .ToList();
 
         // 4. 前半5名を「教室」に配置
-        // 部屋リストの安全対策
         if (floor2Rooms == null || floor2Rooms.Count == 0)
             floor2Rooms = new List<string> { "2-A", "2-B", "2-C", "3-A", "3-B" };
 
@@ -661,9 +667,19 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        // デバッグ用
+        // ★★★ 復活させたデバッグログ部分 ★★★
+        Debug.Log("=== 親友出現条件リスト ===");
         foreach (var f in allFriends)
-            if (f != null) Debug.Log($"[Friend Init] {f.name}: {f.assignedCondition} / {f.assignedRoom}");
+        {
+            if (f != null)
+            {
+                string condInfo = f.assignedCondition == ConditionType.Classroom
+                    ? $"教室: {f.assignedRoom}"
+                    : $"条件: {f.assignedCondition}";
+                Debug.Log($"[{f.friendName}] {condInfo}");
+            }
+        }
+        Debug.Log("==========================");
     }
     // 【変更】親友出現条件の判定
     FriendData CheckSpecialConditionFriend()

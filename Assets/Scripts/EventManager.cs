@@ -11,18 +11,20 @@ public class EventManager : MonoBehaviour
     public GameObject eventSelectionPanel;
     public TextMeshProUGUI eventTitleText;
 
-    // ★修正: 固定ボタンの変数は不要になったため削除しました
-    // (dynamic generationを使うため)
+    // 固定ボタン参照
+    public Button btnOption1;
+    public Button btnOption2;
+    public Button btnOption3;
 
-    [Header("--- Dynamic Buttons ---")]
-    public Transform buttonContainer;      // ボタンを並べる親オブジェクト
-    public GameObject buttonPrefab;        // ボタンのプレハブ
+    public TextMeshProUGUI txtOption1;
+    public TextMeshProUGUI txtOption2;
+    public TextMeshProUGUI txtOption3;
 
     [Header("--- Roulette UI References ---")]
     public GameObject roulettePanel;
     public TextMeshProUGUI rouletteText;
 
-    // 選択肢パネルを表示する（動的生成版）
+    // 選択肢パネルを表示する
     public void ShowChoicePanel(string title, string[] labels, UnityAction[] actions)
     {
         if (eventSelectionPanel == null) return;
@@ -30,39 +32,13 @@ public class EventManager : MonoBehaviour
         eventSelectionPanel.SetActive(true);
         if (eventTitleText != null) eventTitleText.text = title;
 
-        // 1. 既存のボタンを全て削除（クリア）
-        // これにより、前のイベントのボタンが残るのを防ぎます
-        if (buttonContainer != null)
-        {
-            foreach (Transform child in buttonContainer)
-            {
-                Destroy(child.gameObject);
-            }
-        }
+        ResetButton(btnOption1);
+        ResetButton(btnOption2);
+        ResetButton(btnOption3);
 
-        // 2. 新しいボタンを生成
-        for (int i = 0; i < labels.Length; i++)
-        {
-            // アクションの数がラベルより少ない場合のエラー回避
-            if (i >= actions.Length) break;
-
-            if (buttonPrefab != null && buttonContainer != null)
-            {
-                GameObject btnObj = Instantiate(buttonPrefab, buttonContainer);
-                Button btn = btnObj.GetComponent<Button>();
-                TextMeshProUGUI txt = btnObj.GetComponentInChildren<TextMeshProUGUI>();
-
-                if (txt != null) txt.text = labels[i];
-
-                // クリック時の動作登録
-                int index = i; // クロージャ用の一時変数
-                btn.onClick.AddListener(() =>
-                {
-                    actions[index].Invoke();
-                    ClosePanel();
-                });
-            }
-        }
+        if (labels.Length > 0) SetupButton(btnOption1, txtOption1, labels[0], (actions.Length > 0) ? actions[0] : null);
+        if (labels.Length > 1) SetupButton(btnOption2, txtOption2, labels[1], (actions.Length > 1) ? actions[1] : null);
+        if (labels.Length > 2) SetupButton(btnOption3, txtOption3, labels[2], (actions.Length > 2) ? actions[2] : null);
     }
 
     public void ClosePanel()
@@ -70,73 +46,104 @@ public class EventManager : MonoBehaviour
         if (eventSelectionPanel != null) eventSelectionPanel.SetActive(false);
     }
 
-    // ★修正: ここにあった余計な '}' を削除し、古い SetupButton メソッドも削除しました
+    private void ResetButton(Button btn)
+    {
+        if (btn != null)
+        {
+            btn.gameObject.SetActive(false);
+            btn.onClick.RemoveAllListeners();
+        }
+    }
 
-    // ルーレット演出
-    public IEnumerator PlayRoulette(PlayerStats stats, bool hasBadEventProtection)
+    private void SetupButton(Button btn, TextMeshProUGUI txt, string label, UnityAction action)
+    {
+        if (btn == null) return;
+        btn.gameObject.SetActive(true);
+        if (txt != null) txt.text = label;
+
+        if (action != null)
+        {
+            btn.onClick.AddListener(() => { ClosePanel(); action.Invoke(); });
+        }
+        else
+        {
+            btn.onClick.AddListener(ClosePanel);
+        }
+    }
+
+    // ★重要: ここで関数名を 'PlayRouletteSequence' と定義しています
+    public IEnumerator PlayRouletteSequence(PlayerStats stats, int currentGrade, bool hasProtection, System.Action onComplete)
     {
         if (roulettePanel) roulettePanel.SetActive(true);
-        string[] visualResults = { "友達+", "GP+", "GP-", "友達-", "ステUP" };
 
-        // パラパラ演出
+        string[] visualTexts = { "友達できるかな？", "お金拾うかも？", "落とし穴！？", "勉強中……", "ナンパ待ち……" };
+
+        // 演出: パラパラ表示
+        float duration = 1.5f;
         float timer = 0f;
-        while (timer < 1.5f)
+        while (timer < duration)
         {
-            if (rouletteText) rouletteText.text = visualResults[Random.Range(0, visualResults.Length)];
+            if (rouletteText)
+                rouletteText.text = visualTexts[Random.Range(0, visualTexts.Length)];
             yield return new WaitForSeconds(0.1f);
             timer += 0.1f;
         }
 
-        // 内部判定
+        // 判定ロジック
         int roll = Random.Range(0, 100);
         string resultMsg = "";
 
-        if (roll < 30)
+        if (roll < 30) // 友達+
         {
-            stats.friends += 1;
-            resultMsg = "友達ゲット！";
+            int val = currentGrade * 1 + stats.commuLv;
+            stats.friends += val;
+            resultMsg = $"友達が {val}人 できた！";
         }
-        else if (roll < 55)
+        else if (roll < 55) // GP+
         {
-            stats.gp += 300;
-            resultMsg = "GPゲット！";
+            int gain = currentGrade * 150 + stats.galLv * 100;
+            stats.gp += gain;
+            resultMsg = $"臨時収入！ {gain} GP ゲット！";
         }
-        else if (roll < 80)
+        else if (roll < 80) // GP-
         {
-            if (hasBadEventProtection)
+            if (hasProtection)
             {
                 stats.gp += 100;
-                resultMsg = "親友効果: GP+100";
+                resultMsg = "親友効果: 浪費を回避して GP+100！";
             }
             else
             {
-                stats.gp = Mathf.Max(0, stats.gp - 200);
-                resultMsg = "GP減少...";
+                int loss = currentGrade * 100;
+                stats.gp = Mathf.Max(0, stats.gp - loss);
+                resultMsg = $"無駄遣いしてしまった…… GP -{loss}";
             }
         }
-        else if (roll < 95)
+        else if (roll < 95) // 友達-
         {
-            if (hasBadEventProtection)
+            if (hasProtection)
             {
                 stats.gp += 100;
-                resultMsg = "親友効果: GP+100";
+                resultMsg = "親友効果: 喧嘩を回避して GP+100！";
             }
             else
             {
                 if (stats.friends > 0) stats.friends--;
-                resultMsg = "友達減少...";
+                resultMsg = "友達と喧嘩してしまった…… 友達 -1";
             }
         }
-        else
+        else // ステータスUP
         {
             stats.commuLv++;
-            resultMsg = "ステータスUP!";
+            resultMsg = "勉強してコミュ力が上がった！";
         }
 
         if (rouletteText) rouletteText.text = resultMsg;
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSeconds(2.0f);
 
         if (roulettePanel) roulettePanel.SetActive(false);
-    }
 
-} // ★クラスの閉じ括弧はここ（一番最後）だけにする
+        // 完了通知
+        onComplete?.Invoke();
+    }
+}
