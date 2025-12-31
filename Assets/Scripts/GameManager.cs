@@ -229,58 +229,6 @@ public class GameManager : MonoBehaviour
         UpdateMainUI();
     }
 
-    // --- 5. マス到着時の処理 (親友能力の実装) ---
-    void OnTileReached(int index)
-    {
-        string type = "Normal";
-        if (boardManager != null && boardManager.BoardLayout != null && index < boardManager.BoardLayout.Count)
-            type = boardManager.BoardLayout[index];
-
-        // 親友能力チェック
-        bool doubleEffect = HasFriendEffect(FriendEffectType.DoubleTileEffect); // ユナ
-        bool nullifyMinus = HasFriendEffect(FriendEffectType.NullifyGPMinus);   // サオリ
-        bool badToGP = HasFriendEffect(FriendEffectType.BadToGP);               // ノア (★変数名修正済み)
-        bool gpBoost = HasFriendEffect(FriendEffectType.GPMultiplier);          // ミレイ
-        bool hasEmi = HasFriendEffect(FriendEffectType.ShopDiscount);           // エミ
-
-        int multiplier = doubleEffect ? 2 : 1;
-
-        switch (type)
-        {
-            case "GPPlus":
-                int gain = (stats.currentGrade * 100) * multiplier;
-                if (gpBoost) gain = (int)(gain * 1.5f);
-                stats.gp += gain;
-                stats.gpPlusTileCount++;
-                AddLog($"バイト代 +{gain}GP");
-                break;
-
-            case "GPMinus":
-                int loss = (stats.currentGrade * 100) * multiplier;
-                if (nullifyMinus) { loss = 0; AddLog("サオリ効果で回避！"); }
-                else if (badToGP) { stats.gp += loss; AddLog($"ノア効果で +{loss}GP！"); loss = 0; }
-
-                if (loss > 0)
-                {
-                    stats.gp = Mathf.Max(0, stats.gp - loss);
-                    stats.gpMinusTileCount++;
-                    AddLog($"出費... -{loss}GP");
-                }
-                break;
-
-            case "Shop":
-                AddLog("購買部に到着");
-                StartCoroutine(shopManager.OpenShop(true || hasEmi)); // 停止時は割引
-                break;
-
-            case "Event":
-                FriendData target = CheckScoutableFriend();
-                if (target != null) RecruitFriend(target);
-                else AddLog("ランダムイベント発生");
-                break;
-        }
-        EndTurn();
-    }
 
     // --- ゲーム進行 ---
     void OnDiceClicked()
@@ -359,19 +307,18 @@ public class GameManager : MonoBehaviour
         OnTileReached(currentTileIndex);
     }
 
-    // --- 5. マス到着時の処理 (親友能力の実装) ---
+    // --- マス到着処理 (親友能力の実装) ---
+    // ※この関数が2つあるとエラーになります。1つにしてください。
     void OnTileReached(int index)
     {
-        string type = "Normal";
-        if (boardManager != null && boardManager.BoardLayout != null && index < boardManager.BoardLayout.Count)
-            type = boardManager.BoardLayout[index];
+        string type = GetTileType(index);
 
         // 親友能力チェック
-        bool doubleEffect = HasFriendEffect(FriendEffectType.DoubleTileEffect); // ユナ
-        bool nullifyMinus = HasFriendEffect(FriendEffectType.NullifyGPMinus);   // サオリ
-        bool badToGP = HasFriendEffect(FriendEffectType.BadToGP);               // ノア (★変数名修正済み)
-        bool gpBoost = HasFriendEffect(FriendEffectType.GPMultiplier);          // ミレイ
-        bool hasEmi = HasFriendEffect(FriendEffectType.ShopDiscount);           // エミ
+        bool doubleEffect = HasFriendEffect(FriendEffectType.DoubleTileEffect);
+        bool nullifyMinus = HasFriendEffect(FriendEffectType.NullifyGPMinus);
+        bool badToGP = HasFriendEffect(FriendEffectType.BadToGP);
+        bool gpBoost = HasFriendEffect(FriendEffectType.GPMultiplier);
+        bool hasEmi = HasFriendEffect(FriendEffectType.ShopDiscount);
 
         int multiplier = doubleEffect ? 2 : 1;
 
@@ -382,33 +329,49 @@ public class GameManager : MonoBehaviour
                 if (gpBoost) gain = (int)(gain * 1.5f);
                 stats.gp += gain;
                 stats.gpPlusTileCount++;
-                AddLog($"バイト代 +{gain}GP");
+                AddLog($"バイト代が入った！ +{gain}GP");
                 break;
 
             case "GPMinus":
                 int loss = (stats.currentGrade * 100) * multiplier;
-                if (nullifyMinus) { loss = 0; AddLog("サオリ効果で回避！"); }
-                else if (badToGP) { stats.gp += loss; AddLog($"ノア効果で +{loss}GP！"); loss = 0; }
+                if (nullifyMinus)
+                {
+                    loss = 0;
+                    AddLog("サオリの効果で出費を回避しました！");
+                }
+                else if (badToGP)
+                {
+                    stats.gp += loss;
+                    AddLog($"ノアの効果で逆に {loss}GP 儲かりました！");
+                    loss = 0;
+                }
 
                 if (loss > 0)
                 {
                     stats.gp = Mathf.Max(0, stats.gp - loss);
                     stats.gpMinusTileCount++;
-                    AddLog($"出費... -{loss}GP");
+                    AddLog($"出費がかさんだ... -{loss}GP");
                 }
                 break;
 
             case "Shop":
-                AddLog("購買部に到着");
-                StartCoroutine(shopManager.OpenShop(true || hasEmi)); // 停止時は割引
+                AddLog("購買部に到着しました。");
+                StartCoroutine(shopManager.OpenShop(true || hasEmi)); // 停車時割引
                 break;
 
             case "Event":
                 FriendData target = CheckScoutableFriend();
-                if (target != null) RecruitFriend(target);
-                else AddLog("ランダムイベント発生");
+                if (target != null)
+                {
+                    RecruitFriend(target);
+                }
+                else
+                {
+                    AddLog("イベント発生 (内容はランダム)");
+                }
                 break;
         }
+
         EndTurn();
     }
 

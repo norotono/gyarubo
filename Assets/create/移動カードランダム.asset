@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 814facc86231ff44cb5697efe50703df, type: 3}
-  m_Name: Item_Cosme
+  m_Name: "\u79FB\u52D5\u30AB\u30FC\u30C9\u30E9\u30F3\u30C0\u30E0"
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: "\u65B0\u4F5C\u30B3\u30B9\u30E1"
-  description: "\u30B3\u30DF\u30E5\u529B\u304C\u4E0A\u304C\u308B\u9B54\u6CD5\u306E\u7C89\u3002"
-  icon: {fileID: 10911, guid: 0000000000000000f000000000000000, type: 0}
-  basePrice: 1500
-  itemType: 6
+  itemName: MoveCard_RandomShop
+  description: "\u8CB7\u3046\u3068\u3010A\u79FB\u52D5\u30AB\u30FC\u30C9\u3011\u306E\u3069\u308C\u304B\u306B\u306A\u308B"
+  icon: {fileID: -2413806693520163455, guid: cd5d426dc90ee2a4ca34847223fc9b29, type: 3}
+  basePrice: 150
+  itemType: 1
   moveSteps: 0
-  effectValue: 1
+  effectValue: 0
   priceIncrement: 0
-  targetStatus: 1
+  targetStatus: 0
   grade3Only: 0

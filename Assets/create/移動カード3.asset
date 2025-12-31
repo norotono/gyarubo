@@ -15,8 +15,10 @@ MonoBehaviour:
   itemName: "\u79FB\u52D5\u30AB\u30FC\u30C93"
   description: "\u78BA\u5B9F\u306B3\u30DE\u30B9\u9032\u3080\u3002"
   icon: {fileID: -2413806693520163455, guid: cd5d426dc90ee2a4ca34847223fc9b29, type: 3}
-  basePrice: 500
+  basePrice: 150
   itemType: 0
   moveSteps: 3
   effectValue: 0
+  priceIncrement: 0
   targetStatus: 0
+  grade3Only: 0

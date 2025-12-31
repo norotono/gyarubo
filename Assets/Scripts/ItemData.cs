@@ -1,52 +1,44 @@
 using UnityEngine;
 
-public enum FriendEffectType
+public enum ItemType
 {
-    ScoreDoubler,       // アイ: 加入時スコア2倍
-    GPMultiplier,       // ミレイ: GP獲得1.5倍
-    ShopDiscount,       // エミ: 購買20%OFF
-    DiceReroll,         // カオル: ダイスリロール(未実装)
-    DoubleTileEffect,   // ユナ: マス効果2回
-    BadToGP,            // ノア: 不幸をGP変換
-    AutoFriend,         // レナ: 毎ターン友達+1
-    NullifyGPMinus,     // サオリ: GP減少無効
-    MobPromo100,        // マキ: モブ昇格100%(イベント用)
-    CardGenerator,      // リカ: 12ターン毎にカード生成
-    None                // 効果なし
+    MoveCard_Fixed,     // 1-6の固定移動 (インベントリに入る実体)
+    MoveCard_RandomShop,// ショップ用くじ (買うとFixedに変化)
+    MoveCard_HighLow,   // 倍額カード
+    ClassroomAccess,    // 生徒手帳
+    Recovery,           // プレゼント・回復
+    ForceEvent,         // イベント強制
+    StatusUp,           // ステータスUP
+    FriendBoost,        // 卒業写真
+    DynamicPrice        // 卒業アルバム
 }
 
-// 出現条件の種類
-public enum ScoutConditionType
+public enum TargetStatus
 {
-    Fixed_Ai,       // アイ専用 (男子8回 or GP5000)
-    Classroom,      // 教室 (生徒手帳が必要)
-    // --- ランダム割り当て用 ---
-    MaleContact,    // 会話: 男子接触
-    HighGP_Tile,    // 幸福: GP増マス
-    LowGP_Tile,     // 不幸: GP減マス
-    DiceOne,        // ダイス: 1の目
-    RichGP,         // 金満: 所持金
-    HighSpend,      // 浪費: 購買額
-    HighFriends,    // 友達: 人数
-    HighSteps,      // 歩数: 合計移動
-    Solitude,       // 孤独: ソロプレイ
-    HighStatus,     // ステータス: 全ステ
-    None
+    None,
+    Commu,
+    Gal,
+    Lemon,
+    All    // 全ステータスUP用
 }
 
-[CreateAssetMenu(fileName = "NewFriend", menuName = "Gyarubo/FriendData")]
-public class FriendData : ScriptableObject
+[CreateAssetMenu(fileName = "NewItem", menuName = "Gyarubo/ItemData")]
+public class ItemData : ScriptableObject
 {
-    public string characterName;
-    [TextArea] public string introduction;
-    public Sprite faceIcon;
+    public string itemName;
+    [TextArea] public string description;
+    public Sprite icon;
 
-    [Header("Ability")]
-    public FriendEffectType effectType;
-    public int baseScore = 10;
+    public int basePrice; // 基本価格
+    public ItemType itemType;
 
-    [Header("Runtime State (自動設定)")]
-    public bool isRecruited = false;
-    public ScoutConditionType conditionType;
-    public int conditionValue;
+    [Header("Effects")]
+    [Range(0, 6)]
+    public int moveSteps;        // 固定カードの場合の数字 (1-6)
+    public int effectValue;      // 友達増加数や回復量
+    public int priceIncrement;   // 価格上昇額
+    public TargetStatus targetStatus; // ステータスUP対象
+
+    [Header("Availability")]
+    public bool grade3Only;      // 3階限定フラグ
 }

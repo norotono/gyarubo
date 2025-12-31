@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 814facc86231ff44cb5697efe50703df, type: 3}
-  m_Name: Item_Cosme
+  m_Name: "\u30D7\u30EC\u30BC\u30F3\u30C8"
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: "\u65B0\u4F5C\u30B3\u30B9\u30E1"
-  description: "\u30B3\u30DF\u30E5\u529B\u304C\u4E0A\u304C\u308B\u9B54\u6CD5\u306E\u7C89\u3002"
-  icon: {fileID: 10911, guid: 0000000000000000f000000000000000, type: 0}
-  basePrice: 1500
-  itemType: 6
+  itemName: Recovery
+  description: "\u7537\u53CB\u9054\u306E\u597D\u611F\u5EA6\u4E0A\u3052"
+  icon: {fileID: 0}
+  basePrice: 500
+  itemType: 4
   moveSteps: 0
-  effectValue: 1
+  effectValue: 0
   priceIncrement: 0
-  targetStatus: 1
+  targetStatus: 0
   grade3Only: 0
