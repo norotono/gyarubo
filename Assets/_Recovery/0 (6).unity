@@ -3042,7 +3042,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 1.9717, y: -238}
+  m_AnchoredPosition: {x: 1.9717, y: -236}
   m_SizeDelta: {x: 436.0491, y: 81.2662}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &898555354
@@ -3220,7 +3220,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &960329313
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3685,16 +3685,16 @@ MonoBehaviour:
   assetText: {fileID: 1925333483}
   statusText: {fileID: 893163863}
   allFriends:
-  - {fileID: 11400000, guid: be39f559124cd654baccf58bb22a1f4c, type: 2}
-  - {fileID: 11400000, guid: b49cb9d51d928a04cbdc9a63125254b0, type: 2}
-  - {fileID: 11400000, guid: e24e2640900494b42a86f0e1286448b0, type: 2}
-  - {fileID: 11400000, guid: 2f09d0c68ec28314b80ec41d40aa0b85, type: 2}
-  - {fileID: 11400000, guid: 5c802a1cf3c78064e8f29a21a00173cb, type: 2}
-  - {fileID: 11400000, guid: f0278016702ceef458b6db504468c80c, type: 2}
-  - {fileID: 11400000, guid: 8c55ca9a720d0024886d59cbd10f848e, type: 2}
-  - {fileID: 11400000, guid: 757fcbd2163e16a439e8c8760279da95, type: 2}
-  - {fileID: 11400000, guid: 0fa0b24fa120c2a45ae1d7c57294f7ba, type: 2}
-  - {fileID: 11400000, guid: 206f12881063ac542b7cb5548a0ea361, type: 2}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   floor2Rooms:
   - 2-A
   - 2-B
@@ -6464,7 +6464,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 1.9717, y: -93}
+  m_AnchoredPosition: {x: 1.9717, y: -103}
   m_SizeDelta: {x: 436.0491, y: 81.2662}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1917496578

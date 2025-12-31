@@ -10,13 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6cb18ae3b71a9f3498045daaf7564c7a, type: 3}
-  m_Name: "\u30CE\u30A2"
+  m_Name: "\u30B5\u30AA\u30EA"
   m_EditorClassIdentifier: Assembly-CSharp::FriendData
-  characterName: "\u30CE\u30A2"
-  introduction: "\u4E0D\u5E78\u3092GP\u5909\u63DB"
+  friendName: "\u30B5\u30AA\u30EA"
   faceIcon: {fileID: 0}
-  effectType: 5
-  baseScore: 10
-  isRecruited: 0
-  conditionType: 0
-  conditionValue: 0
+  isAi: 0
+  effectType: 7

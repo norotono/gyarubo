@@ -606,49 +606,84 @@ public class GameManager : MonoBehaviour
 
     // 【変更】親友データの初期化と条件のランダム割り当て
     // 【修正】GameManager.cs の InitializeFriends 関数
+    // GameManager.cs の InitializeFriends メソッドを以下と差し替えてください
+
+    // 【変更】親友データの初期化と条件のランダム割り当て（自動補正版）
+    // 【変更】親友データの初期化（自動ロード機能付き）
+    // 【変更】フォルダから一括読み込みして初期化（シンプル版）
+    // 【修正】フォルダから読み込み + 名前未設定対策済み
+    // 【修正完了版】データ自動ロード + 名前未設定対策 + 条件一覧ログ出力
     void InitializeFriends()
     {
-        // リスト設定チェック
-        if (allFriends == null)
+        Debug.Log("--- 友達データの読み込みと初期化を開始 ---");
+
+        // 1. Resources/Friends フォルダから全データをロード
+        FriendData[] loadedData = Resources.LoadAll<FriendData>("Friends");
+
+        if (loadedData != null && loadedData.Length > 0)
         {
-            Debug.LogError("【Error】GameManagerの 'All Friends' リストが設定されていません！");
+            // リストを上書き
+            allFriends = loadedData.ToList();
+        }
+        else
+        {
+            Debug.LogError("【Error】Resources/Friends フォルダにデータが見つかりません！");
             return;
         }
 
-        // 1. 全員の状態をリセット
+        // 2. リスト内の null（空データ）を削除
+        allFriends.RemoveAll(f => f == null);
+
+        // 3. パラメータのリセット
         foreach (var f in allFriends)
         {
-            if (f == null) continue;
             f.isRecruited = false;
             f.assignedCondition = ConditionType.None;
             f.assignedRoom = "";
             f.isHintRevealed = false;
         }
 
-        // 2. 「アイ」は特殊条件固定
-        var ai = allFriends.FirstOrDefault(f => f != null && f.isAi);
-        if (ai != null) ai.assignedCondition = ConditionType.Ai_Fixed;
+        // 4. 「アイ」役を決定（名前未設定でもエラーにならないよう対策済み）
+        // ★修正ポイント: f.friendName != null のチェックを追加
+        var ai = allFriends.FirstOrDefault(f =>
+            f.isAi || (f.friendName != null && f.friendName.Contains("アイ"))
+        );
 
-        // 3. アイ以外のメンバーをシャッフル
-        var otherFriends = allFriends
-            .Where(f => f != null && !f.isAi)
+        if (ai != null)
+        {
+            ai.assignedCondition = ConditionType.Ai_Fixed;
+        }
+        else
+        {
+            // アイが見つからない場合、リストの先頭をアイ役にする
+            if (allFriends.Count > 0)
+            {
+                allFriends[0].assignedCondition = ConditionType.Ai_Fixed;
+                string tempName = allFriends[0].friendName ?? "名前なし";
+                Debug.LogWarning($"アイ役が見つからないため、'{tempName}' をアイ条件に設定しました。");
+            }
+        }
+
+        // 5. アイ以外のメンバーをシャッフル
+        var others = allFriends
+            .Where(f => f.assignedCondition == ConditionType.None)
             .OrderBy(x => Random.value)
             .ToList();
 
-        // 4. 前半5名を「教室」に配置
+        // 6. 前半5名を「教室」に配置
         if (floor2Rooms == null || floor2Rooms.Count == 0)
             floor2Rooms = new List<string> { "2-A", "2-B", "2-C", "3-A", "3-B" };
 
         for (int i = 0; i < 5; i++)
         {
-            if (i < otherFriends.Count)
+            if (i < others.Count)
             {
-                otherFriends[i].assignedCondition = ConditionType.Classroom;
-                otherFriends[i].assignedRoom = floor2Rooms[i % floor2Rooms.Count];
+                others[i].assignedCondition = ConditionType.Classroom;
+                others[i].assignedRoom = floor2Rooms[i % floor2Rooms.Count];
             }
         }
 
-        // 5. 後半4名を「ランダムな特殊条件」に割り当て
+        // 7. 残りのメンバーを「ランダムな特殊条件」に割り当て
         List<ConditionType> randomConditions = new List<ConditionType>
         {
             ConditionType.Conversation, ConditionType.Happiness, ConditionType.Unhappiness,
@@ -658,29 +693,38 @@ public class GameManager : MonoBehaviour
         };
         randomConditions = randomConditions.OrderBy(x => Random.value).ToList();
 
-        for (int i = 5; i < otherFriends.Count; i++)
+        var remaining = others.Where(f => f.assignedCondition == ConditionType.None).ToList();
+
+        for (int i = 0; i < remaining.Count; i++)
         {
-            int condIndex = i - 5;
-            if (condIndex < randomConditions.Count)
-            {
-                otherFriends[i].assignedCondition = randomConditions[condIndex];
-            }
+            if (i < randomConditions.Count)
+                remaining[i].assignedCondition = randomConditions[i];
+            else
+                remaining[i].assignedCondition = ConditionType.Conversation; // 条件不足時は「会話」
         }
 
-        // ★★★ 復活させたデバッグログ部分 ★★★
-        Debug.Log("=== 親友出現条件リスト ===");
+
+        // ★★★ 追加: 全員の名前と出現条件をログに出力 ★★★
+        Debug.Log("=========================================");
+        Debug.Log($"【親友出現条件一覧】(全 {allFriends.Count} 名)");
+        Debug.Log("=========================================");
+
         foreach (var f in allFriends)
         {
-            if (f != null)
-            {
-                string condInfo = f.assignedCondition == ConditionType.Classroom
-                    ? $"教室: {f.assignedRoom}"
-                    : $"条件: {f.assignedCondition}";
-                Debug.Log($"[{f.friendName}] {condInfo}");
-            }
+            // 名前がnullの場合は "名前未設定" と表示
+            string dName = string.IsNullOrEmpty(f.friendName) ? "名前未設定" : f.friendName;
+
+            // 条件の詳細テキストを取得（ヒントテキストを活用）
+            // ※FriendData.GetHintText() は内部で friendName を使うため、名前未設定だと少し変な表示になる可能性がありますがエラーにはなりません
+            string hint = f.GetHintText();
+
+            // ログを見やすく整形
+            // 例: [ミレイ] Happiness : ミレイは【GP増幅マスに5回止まる】と...
+            Debug.Log($"[{dName}] 条件タイプ: {f.assignedCondition}\n詳細: {hint}");
         }
-        Debug.Log("==========================");
+        Debug.Log("=========================================");
     }
+
     // 【変更】親友出現条件の判定
     FriendData CheckSpecialConditionFriend()
     {
