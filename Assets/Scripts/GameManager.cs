@@ -92,7 +92,8 @@ public class GameManager : MonoBehaviour
         int result = Random.Range(1, 7);
         if (diceImage && diceSprites.Length >= 6)
             diceImage.sprite = diceSprites[result - 1];
-
+        // ★追加: 1の目カウント (親友条件: DiceOne用)
+        if (result == 1) playerStats.diceOneCount++;
         // ダイスボーナス
         if (result == 5) { playerStats.gp += 100; AddLog("ボーナス: GP+100"); }
         if (result == 6) { playerStats.friends += 1; AddLog("ボーナス: 友達+1"); }
@@ -104,6 +105,8 @@ public class GameManager : MonoBehaviour
 
     IEnumerator MovePlayer(int steps)
     {
+        // ★追加: 歩数カウントを加算 (親友条件: Steps用)
+        playerStats.totalSteps += steps;
         for (int i = 0; i < steps; i++)
         {
             currentTileIndex++;
@@ -294,8 +297,16 @@ public class GameManager : MonoBehaviour
     {
         int shinyu = allFriends.Count(f => f.isRecruited);
         playerStats.gp += playerStats.CalculateSalary(shinyu);
-        if (HasFriendEffect(FriendEffectType.AutoFriend)) AddFriend(1);
-
+        // ★追加: リカの能力 (12ターンごとにカード生成)
+        if (HasFriendEffect(FriendEffectType.CardGeneration) && playerStats.currentTurn % 12 == 0)
+        {
+            // インベントリ上限チェックが必要ならここに記述
+            if (playerStats.moveCards.Count < 5)
+            {
+                playerStats.moveCards.Add(Random.Range(1, 7)); // 1-6のランダムカード
+                AddLog("リカの能力: 定期便で移動カードが届きました！");
+            }
+        }
         playerStats.currentTurn++;
         playerStats.currentMonth++;
         if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
@@ -323,21 +334,143 @@ public class GameManager : MonoBehaviour
     void AddLog(string msg) { Debug.Log(msg); if (phoneUI) phoneUI.AddLog(msg); }
     void AddGP(int v) { if (HasFriendEffect(FriendEffectType.GPMultiplier)) v = (int)(v * 1.5f); playerStats.gp += v; }
     void AddFriend(int v) { playerStats.friends += v; }
-    void RecruitFriend(FriendData f) { f.isRecruited = true; if (f.effectType == FriendEffectType.DoubleScoreOnJoin) playerStats.friends *= 2; }
+    // 【追加】親友加入処理
+    void RecruitFriend(FriendData f)
+    {
+        if (f.isRecruited) return;
+
+        f.isRecruited = true;
+        AddLog($"【祝】{f.name} が親友になった！");
+
+        // アイの能力: 加入時に一度だけ友達数2倍
+        if (f.effectType == FriendEffectType.DoubleScoreOnJoin)
+        {
+            playerStats.friends *= 2;
+            AddLog("アイの能力発動！ 友達の数が 2倍 になった！");
+            UpdateMainUI();
+        }
+    }
     bool HasFriendEffect(FriendEffectType t) { return allFriends.Any(f => f.isRecruited && f.effectType == t); }
 
+    // 【変更】親友データの初期化と条件のランダム割り当て
     void InitializeFriends()
     {
-        foreach (var f in allFriends) { f.isRecruited = false; f.assignedCondition = ConditionType.None; }
-        // 簡易実装：ランダム割り当てロジックは必要に応じてここに復活させる
-    }
-
-    FriendData CheckSpecialConditionFriend()
-    {
-        // 簡易実装：孤立条件のみチェック
+        // 1. 全員の状態をリセット
         foreach (var f in allFriends)
         {
-            if (!f.isRecruited && f.assignedCondition == ConditionType.Solitude && playerStats.soloPlayConsecutive >= 3) return f;
+            f.isRecruited = false;
+            f.assignedCondition = ConditionType.None;
+            f.assignedRoom = "";
+        }
+
+        // 2. 「アイ」は特殊条件固定
+        var ai = allFriends.FirstOrDefault(f => f.isAi);
+        if (ai != null)
+        {
+            ai.assignedCondition = ConditionType.Ai_Fixed;
+        }
+
+        // 3. アイ以外のメンバーをシャッフル
+        var otherFriends = allFriends.Where(f => !f.isAi).OrderBy(x => Random.value).ToList();
+
+        // 4. 前半5名を「教室」に配置
+        // floor2Rooms: 2-A, 2-B... などの部屋リストを使用
+        for (int i = 0; i < 5; i++)
+        {
+            if (i < otherFriends.Count)
+            {
+                otherFriends[i].assignedCondition = ConditionType.Classroom;
+                // 部屋リストがあれば割り当て（なければ仮の部屋名）
+                if (i < floor2Rooms.Count) otherFriends[i].assignedRoom = floor2Rooms[i];
+                else otherFriends[i].assignedRoom = "空き教室";
+            }
+        }
+
+        // 5. 後半4名を「ランダムな特殊条件」に割り当て
+        List<ConditionType> randomConditions = new List<ConditionType>
+        {
+            ConditionType.Conversation, ConditionType.Happiness, ConditionType.Unhappiness,
+            ConditionType.DiceOne, ConditionType.Rich, ConditionType.Wasteful,
+            ConditionType.Popularity, ConditionType.Steps, ConditionType.Solitude,
+            ConditionType.StatusAll2
+        };
+        // 条件リストをシャッフル
+        randomConditions = randomConditions.OrderBy(x => Random.value).ToList();
+
+        for (int i = 5; i < otherFriends.Count; i++)
+        {
+            // 残りのメンバーに条件を割り振る
+            int condIndex = i - 5;
+            if (condIndex < randomConditions.Count)
+            {
+                otherFriends[i].assignedCondition = randomConditions[condIndex];
+            }
+        }
+
+        // デバッグ用: 割り当て結果を表示
+        foreach (var f in allFriends)
+            Debug.Log($"[Friend Init] {f.name}: {f.assignedCondition} / {f.assignedRoom}");
+    }
+
+    // 【変更】親友出現条件の判定
+    FriendData CheckSpecialConditionFriend()
+    {
+        foreach (var f in allFriends)
+        {
+            // 既に仲間、または教室配置のキャラはスキップ
+            if (f.isRecruited || f.assignedCondition == ConditionType.Classroom) continue;
+
+            bool isMet = false;
+
+            switch (f.assignedCondition)
+            {
+                case ConditionType.Ai_Fixed:
+                    // 男子接触8回以上 or 所持金5000以上
+                    isMet = (playerStats.maleContactCount >= 8 || playerStats.gp >= 5000);
+                    break;
+
+                case ConditionType.Conversation: // 会話: 男子接触4回以上
+                    isMet = (playerStats.maleContactCount >= 4);
+                    break;
+
+                case ConditionType.Happiness: // 幸福: GP増幅マス5回以上
+                    isMet = (playerStats.gpIncreaseTileCount >= 5);
+                    break;
+
+                case ConditionType.Unhappiness: // 不幸: GP減少マス3回以上
+                    isMet = (playerStats.gpDecreaseTileCount >= 3);
+                    break;
+
+                case ConditionType.DiceOne: // ダイス: 1の目3回以上
+                    isMet = (playerStats.diceOneCount >= 3);
+                    break;
+
+                case ConditionType.Rich: // 金満: 3000 GP 以上
+                    isMet = (playerStats.gp >= 3000);
+                    break;
+
+                case ConditionType.Wasteful: // 浪費: 購買消費 4000 GP 以上
+                    isMet = (playerStats.shopSpentTotal >= 4000);
+                    break;
+
+                case ConditionType.Popularity: // 友達: 20人以上
+                    isMet = (playerStats.friends >= 20);
+                    break;
+
+                case ConditionType.Steps: // 歩数: 合計80歩以上
+                    isMet = (playerStats.totalSteps >= 80);
+                    break;
+
+                case ConditionType.Solitude: // 孤独: ぼっち3連続
+                    isMet = (playerStats.soloPlayConsecutive >= 3);
+                    break;
+
+                case ConditionType.StatusAll2: // ステータス: 全て2以上
+                    isMet = playerStats.IsAllStatsOver(2);
+                    break;
+            }
+
+            if (isMet) return f; // 条件を満たした最初の親友を返す
         }
         return null;
     }
