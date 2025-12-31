@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
-// 男友達・彼氏のデータクラス
+// 男友達・彼氏データ
 [System.Serializable]
 public class MaleFriendData
 {
     public string name;
-    public float currentAffection; // 現在の好感度 (0-100)
-    public bool isBoyfriend;       // 彼氏になったか
-    public BoyfriendType effectType; // 彼氏能力タイプ
+    public float currentAffection; // 0-100
+    public bool isBoyfriend;
+    public BoyfriendType effectType;
 
     public MaleFriendData(string n)
     {
@@ -25,105 +25,79 @@ public enum BoyfriendType { None, TypeA_Gp, TypeB_Friend }
 
 public class BoyfriendManager : MonoBehaviour
 {
-    [Header("--- Settings ---")]
     public PlayerStats playerStats;
-
-    // 男の名前候補（ランダム生成用）
     private string[] nameDatabase = { "タクヤ", "カズマ", "ショウ", "レン", "ユウキ", "ハルト", "リク", "ソラ", "コウセイ", "ヤマト" };
 
-    // --- メイン操作 ---
-
-    // 1. 男友達を追加（男子生徒マス用）
+    // 男友達追加
     public void AddNewMaleFriend()
     {
-        // 名前をランダム決定（被り回避は簡易的に無視、またはナンバリング）
         string newName = nameDatabase[Random.Range(0, nameDatabase.Length)] + (playerStats.maleFriendsList.Count + 1);
-
         MaleFriendData newGuy = new MaleFriendData(newName);
         playerStats.maleFriendsList.Add(newGuy);
-
         Debug.Log($"男友達追加: {newName}");
-        // 統計更新
-        playerStats.maleFriendCount = playerStats.maleFriendsList.Count(x => !x.isBoyfriend);
     }
 
-    // 2. 好感度を上げる（デート・プレゼント・中間イベント用）
-    // targetIndex: -1なら「最も好感度が低い人」または「ランダム」など自動選択
-    public string IncreaseAffection(float baseValue, int targetIndex = -1)
+    // 親密度アップ & 彼氏昇格判定
+    public string IncreaseAffection(float baseValue)
     {
         if (playerStats.maleFriendsList.Count == 0) return "相手がいません";
 
-        // 対象決定（指定がなければ、まだ彼氏じゃない人で好感度が高い人を優先、あるいはランダム）
-        // ここでは「彼氏になっていないリストの中で、最も進展している人」を優先します
+        // まだ彼氏じゃない人の中で一番好感度が高い人を優先
         var target = playerStats.maleFriendsList
             .Where(m => !m.isBoyfriend)
             .OrderByDescending(m => m.currentAffection)
             .FirstOrDefault();
 
-        // 彼氏しかいない、または誰もいない場合は彼氏の親密度を上げる（限界突破）
-        if (target == null)
-        {
-            target = playerStats.maleFriendsList.FirstOrDefault();
-            if (target == null) return "男友達がいません";
-        }
+        // 全員彼氏なら、最初の彼氏とデート
+        if (target == null) target = playerStats.maleFriendsList[0];
 
-        // 計算式: (イベント基準値) ÷ (1 ＋ 現在の男友達数 × 0.5)
-        // ※レモン力補正は呼び出し元でbaseValueに加算済とする
+        // 人数による上昇量減衰
         int maleCount = playerStats.maleFriendsList.Count(m => !m.isBoyfriend);
         float multiplier = 1.0f + (maleCount * 0.5f);
         float finalGain = baseValue / multiplier;
 
         target.currentAffection += finalGain;
-        string resultMsg = $"{target.name} の親密度 +{finalGain:F1} (現在: {target.currentAffection:F1}%)";
+        string resultMsg = $"{target.name} 親密度+{finalGain:F1} (現在:{target.currentAffection:F1}%)";
 
-        // 昇格チェック
+        // 100%超えで彼氏昇格
         if (!target.isBoyfriend && target.currentAffection >= 100f)
         {
             PromoteToBoyfriend(target);
-            resultMsg += "\n祝！ 彼氏になりました！";
+            resultMsg += $"\n【祝】{target.name} から告白されました！ 彼氏になった！";
         }
 
         return resultMsg;
     }
 
-    // 3. 彼氏昇格処理
     void PromoteToBoyfriend(MaleFriendData guy)
     {
         guy.isBoyfriend = true;
-
-        // 能力抽選 (Type A: GP+500 / Type B: Friend+2)
-        int roll = Random.Range(0, 2);
-        guy.effectType = (roll == 0) ? BoyfriendType.TypeA_Gp : BoyfriendType.TypeB_Friend;
-
-        // 統計更新
+        // 能力ランダム決定
+        guy.effectType = (Random.Range(0, 2) == 0) ? BoyfriendType.TypeA_Gp : BoyfriendType.TypeB_Friend;
         playerStats.boyfriendCount++;
-        playerStats.maleFriendCount = playerStats.maleFriendsList.Count(x => !x.isBoyfriend);
-
-        Debug.Log($"彼氏昇格: {guy.name} / 能力: {guy.effectType}");
     }
 
-    // 4. 毎ターン終了時の彼氏能力発動
+    // 毎ターンの効果発動
     public string ActivateBoyfriendEffects()
     {
-        int totalGpGain = 0;
-        int totalFriendGain = 0;
-        int bfCount = 0;
+        int totalGp = 0;
+        int totalFriend = 0;
+        int count = 0;
 
         foreach (var guy in playerStats.maleFriendsList)
         {
             if (guy.isBoyfriend)
             {
-                bfCount++;
-                if (guy.effectType == BoyfriendType.TypeA_Gp) totalGpGain += 500;
-                else if (guy.effectType == BoyfriendType.TypeB_Friend) totalFriendGain += 2;
+                count++;
+                if (guy.effectType == BoyfriendType.TypeA_Gp) totalGp += 500;
+                else if (guy.effectType == BoyfriendType.TypeB_Friend) totalFriend += 2;
             }
         }
 
-        if (totalGpGain == 0 && totalFriendGain == 0) return null;
+        if (totalGp == 0 && totalFriend == 0) return null;
 
-        playerStats.gp += totalGpGain;
-        playerStats.friends += totalFriendGain;
-
-        return $"彼氏({bfCount}人)効果: GP+{totalGpGain}, 友+{totalFriendGain}";
+        playerStats.gp += totalGp;
+        playerStats.friends += totalFriend;
+        return $"彼氏({count}人)からのプレゼント: GP+{totalGp}, 友+{totalFriend}";
     }
 }

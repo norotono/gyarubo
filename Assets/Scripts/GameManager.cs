@@ -38,6 +38,8 @@ public class GameManager : MonoBehaviour
     // 内部変数
     private int currentTileIndex = 0;
     private bool isMoving = false;
+    // 親友効果を持っているかチェック
+
     private int middleTileIndex = 24;
 
     private void Start()
@@ -268,45 +270,161 @@ public class GameManager : MonoBehaviour
 
     void HandleEventTile()
     {
-        string[] labels = { "同伴", "親友スカウト", "一人で遊ぶ" };
-        UnityAction[] actions = new UnityAction[3];
+        // 男友達（彼氏含む）がいるか確認
+        bool hasBoys = playerStats.maleFriendsList.Count > 0;
 
-        // 1. 同伴
-        bool canDate = (playerStats.boyfriendCount > 0 || playerStats.maleFriendCount > 0);
-        actions[0] = () => { playerStats.soloPlayConsecutive = 0; EndTurn(); };
+        if (hasBoys)
+        {
+            // 選択肢を出す
+            string[] labels = { "デート/お出かけ", "一人で遊ぶ" };
+            UnityEngine.Events.UnityAction[] actions = new UnityEngine.Events.UnityAction[2];
 
-        // 2. 親友スカウト
-        FriendData target = CheckSpecialConditionFriend();
-        actions[1] = () => {
-            playerStats.soloPlayConsecutive = 0;
-            if (target != null) RecruitFriend(target);
+            // A. デート
+            actions[0] = () =>
+            {
+                StartCoroutine(RunDateEvent());
+            };
+
+            // B. 一人で遊ぶ（親友チェック -> ランダムイベント）
+            actions[1] = () =>
+            {
+                playerStats.soloPlayConsecutive++; // ぼっち回数加算
+                CheckSoloEvent(); // 親友判定へ
+            };
+
+            eventManager.ShowChoicePanel("休日の過ごし方は？", labels, actions);
+        }
+        else
+        {
+            // 男友達がいないので強制的に一人
+            AddLog("一緒に遊ぶ男友達がいません……。一人で遊びます。");
+            playerStats.soloPlayConsecutive++;
+            CheckSoloEvent();
+        }
+    }
+
+    // デートイベント実行
+    IEnumerator RunDateEvent()
+    {
+        playerStats.soloPlayConsecutive = 0; // ぼっち連鎖リセット
+
+        // 親密度上昇 (+レモン力補正)
+        float baseAffection = 20f + (playerStats.lemonLv * 5);
+        string result = boyfriendManager.IncreaseAffection(baseAffection);
+        AddLog($"お出かけしました。\n{result}");
+
+        // マキの能力（モブ親友昇格）
+        if (HasFriendEffect(FriendEffectType.MobFriendPromote))
+        {
+            AddLog("マキの能力: 確実に親友(モブ)へ昇格させます！");
+            AddFriend(1);
+        }
+        else
+        {
+            // 通常確率(例:10%)
+            if (Random.Range(0, 100) < 10)
+            {
+                AddLog("なんと！ 友達が親友(モブ)に昇格しました！");
+                AddFriend(1);
+            }
+        }
+
+        yield return new WaitForSeconds(1.0f);
+        EndTurn();
+    }
+
+    // 一人で遊ぶ時の判定（親友 -> ランダム）
+    void CheckSoloEvent()
+    {
+        // 1. 特殊条件親友の出現チェック
+        FriendData newFriend = CheckSpecialConditionFriend();
+        if (newFriend != null)
+        {
+            RecruitFriend(newFriend); // 確定出現
+            EndTurn();
+            return;
+        }
+
+        // 2. 該当者がいなければランダムイベント
+        // (確率: 友+ 30%, GP+ 25%, GP- 25%, 友- 15%, ステ+ 5%)
+        int roll = Random.Range(0, 100);
+        if (roll < 30) // 0-29
+        {
+            AddLog("新しい友達ができた！");
+            AddFriend(currentGrade * 1 + playerStats.commuLv);
+        }
+        else if (roll < 55) // 30-54
+        {
+            int gain = currentGrade * 150 + playerStats.galLv * 100;
+            AddGP(gain);
+            AddLog($"臨時収入！ GP+{gain}");
+        }
+        else if (roll < 80) // 55-79
+        {
+            // ノア・サオリの能力判定はここでも有効にするなら記述
+            int loss = currentGrade * 100;
+            if (HasFriendEffect(FriendEffectType.NullifyGPMinus)) loss = 0;
+            playerStats.gp = Mathf.Max(0, playerStats.gp - loss);
+            AddLog($"無駄遣いしてしまった…… GP-{loss}");
+        }
+        else if (roll < 95) // 80-94
+        {
+            AddLog("友達と喧嘩してしまった…… 友達-1");
+            if (playerStats.friends > 0) playerStats.friends--;
+        }
+        else // 95-99
+        {
+            AddLog("勉強がはかどった！ コミュ力UP (仮)");
+            // どのステータスを上げるかはランダム等の処理
+        }
+
+        EndTurn();
+    }
+    void HandleMaleTile()
+    {
+        string[] labels = { "情報 (ヒント)", "友達になる", "会話 (GP+300)" };
+        UnityEngine.Events.UnityAction[] actions = new UnityEngine.Events.UnityAction[3];
+
+        // 1. 情報
+        actions[0] = () =>
+        {
+            // nullを除外して検索
+            var unknownFriends = allFriends
+                .Where(f => f != null && !f.isRecruited && !f.isHintRevealed)
+                .OrderBy(x => Random.value)
+                .ToList();
+
+            if (unknownFriends.Count > 0)
+            {
+                var target = unknownFriends[0];
+                target.isHintRevealed = true;
+
+                string hint = target.GetHintText();
+                AddLog($"【情報】\n{hint}");
+
+                AddGP(500);
+                AddFriend(2);
+                AddLog("情報を入手した報酬: GP+500, 友達+2");
+            }
+            else
+            {
+                AddLog("めぼしい情報はもうないみたい……。");
+            }
             EndTurn();
         };
 
-        // 3. 一人で遊ぶ（ルーレット）
-        actions[2] = () => {
-            playerStats.soloPlayConsecutive++;
-            StartCoroutine(RunRoulette());
-        };
-
-        eventManager.ShowChoicePanel("イベント", labels, actions);
-        eventManager.SetButtonInteractable(0, canDate);
-        eventManager.SetButtonInteractable(1, target != null && !canDate);
-    }
-
-    void HandleMaleTile()
-    {
-        string[] labels = { "情報", "友達になる", "会話 (GP+300)" };
-        UnityEngine.Events.UnityAction[] actions = new UnityEngine.Events.UnityAction[3];
-
-        // 1. 情報 (実装済みと仮定)
-        actions[0] = () => { /* 情報処理 */ EndTurn(); };
-
-        // 2. 友達になる (修正箇所)
+        // 2. 友達になる (BoyfriendManagerのnullチェック追加)
         actions[1] = () => {
-            boyfriendManager.AddNewMaleFriend(); // ★呼び出し
-            AddLog("新しい男友達ができました！");
-            playerStats.maleContactCount++; // 接触カウントは共通
+            if (boyfriendManager != null)
+            {
+                boyfriendManager.AddNewMaleFriend();
+                AddLog("新しい男友達ができました！");
+            }
+            else
+            {
+                Debug.LogError("BoyfriendManagerがアタッチされていません！");
+            }
+            playerStats.maleContactCount++;
             EndTurn();
         };
 
@@ -317,7 +435,7 @@ public class GameManager : MonoBehaviour
             EndTurn();
         };
 
-        eventManager.ShowChoicePanel("男子生徒", labels, actions);
+        eventManager.ShowChoicePanel("男子生徒に話しかけますか？", labels, actions);
     }
 
     void HandleMiddleTile()
@@ -341,15 +459,29 @@ public class GameManager : MonoBehaviour
 
     // --- ターン終了・補助 ---
 
+    // 【修正】ターン終了処理（完全版）
     void EndTurn()
     {
-        int shinyu = allFriends.Count(f => f.isRecruited);
+        // 1. 給料計算 (null安全化)
+        int shinyu = 0;
+        if (allFriends != null)
+        {
+            shinyu = allFriends.Count(f => f != null && f.isRecruited);
+        }
         playerStats.gp += playerStats.CalculateSalary(shinyu);
 
-        // レナの能力: 毎ターン友達+1
+        // 2. レナの能力 (友達+1)
         if (HasFriendEffect(FriendEffectType.AutoFriend)) AddFriend(1);
 
-        // ★追加: リカの能力 (12ターンごとにカード生成)
+        // 3. 彼氏の能力発動 (null安全化)
+        // BoyfriendManagerがアタッチされていれば発動
+        if (boyfriendManager != null)
+        {
+            string bfLog = boyfriendManager.ActivateBoyfriendEffects();
+            if (!string.IsNullOrEmpty(bfLog)) AddLog(bfLog);
+        }
+
+        // 4. リカの能力 (カード生成)
         if (HasFriendEffect(FriendEffectType.CardGeneration) && playerStats.currentTurn % 12 == 0)
         {
             if (playerStats.moveCards.Count < 5)
@@ -359,13 +491,16 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        // 5. 日付更新
         playerStats.currentTurn++;
         playerStats.currentMonth++;
         if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
 
+        // 6. UI更新と操作許可
         UpdateMainUI();
         isMoving = false;
-        diceButton.interactable = true;
+
+        if (diceButton != null) diceButton.interactable = true;
     }
 
     void UpdateMainUI()
@@ -402,39 +537,57 @@ public class GameManager : MonoBehaviour
             UpdateMainUI();
         }
     }
-    bool HasFriendEffect(FriendEffectType t) { return allFriends.Any(f => f.isRecruited && f.effectType == t); }
+    public bool HasFriendEffect(FriendEffectType t)
+    {
+        // allFriends自体がnullでないか確認し、かつ各要素(f)がnullでないか確認する
+        return allFriends != null && allFriends.Any(f => f != null && f.isRecruited && f.effectType == t);
+    }
 
     // 【変更】親友データの初期化と条件のランダム割り当て
+    // 【修正】GameManager.cs の InitializeFriends 関数
     void InitializeFriends()
     {
-        // 1. 全員の状態をリセット
+        // 安全対策: リスト自体がない場合はエラーログを出して終了
+        if (allFriends == null)
+        {
+            Debug.LogError("【Error】GameManagerの 'All Friends' リストが設定されていません！");
+            return;
+        }
+
+        // 1. 全員の状態をリセット (nullはスキップ)
         foreach (var f in allFriends)
         {
+            if (f == null) continue; // ★ここが重要
             f.isRecruited = false;
             f.assignedCondition = ConditionType.None;
             f.assignedRoom = "";
+            f.isHintRevealed = false;
         }
 
         // 2. 「アイ」は特殊条件固定
-        var ai = allFriends.FirstOrDefault(f => f.isAi);
+        var ai = allFriends.FirstOrDefault(f => f != null && f.isAi);
         if (ai != null)
         {
             ai.assignedCondition = ConditionType.Ai_Fixed;
         }
 
-        // 3. アイ以外のメンバーをシャッフル
-        var otherFriends = allFriends.Where(f => !f.isAi).OrderBy(x => Random.value).ToList();
+        // 3. アイ以外のメンバーをシャッフル (nullを除外してリスト化)
+        var otherFriends = allFriends
+            .Where(f => f != null && !f.isAi)
+            .OrderBy(x => Random.value)
+            .ToList();
 
         // 4. 前半5名を「教室」に配置
-        // floor2Rooms: 2-A, 2-B... などの部屋リストを使用
+        // 部屋リストの安全対策
+        if (floor2Rooms == null || floor2Rooms.Count == 0)
+            floor2Rooms = new List<string> { "2-A", "2-B", "2-C", "3-A", "3-B" };
+
         for (int i = 0; i < 5; i++)
         {
             if (i < otherFriends.Count)
             {
                 otherFriends[i].assignedCondition = ConditionType.Classroom;
-                // 部屋リストがあれば割り当て（なければ仮の部屋名）
-                if (i < floor2Rooms.Count) otherFriends[i].assignedRoom = floor2Rooms[i];
-                else otherFriends[i].assignedRoom = "空き教室";
+                otherFriends[i].assignedRoom = floor2Rooms[i % floor2Rooms.Count];
             }
         }
 
@@ -446,12 +599,10 @@ public class GameManager : MonoBehaviour
             ConditionType.Popularity, ConditionType.Steps, ConditionType.Solitude,
             ConditionType.StatusAll2
         };
-        // 条件リストをシャッフル
         randomConditions = randomConditions.OrderBy(x => Random.value).ToList();
 
         for (int i = 5; i < otherFriends.Count; i++)
         {
-            // 残りのメンバーに条件を割り振る
             int condIndex = i - 5;
             if (condIndex < randomConditions.Count)
             {
@@ -459,16 +610,20 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        // デバッグ用: 割り当て結果を表示
+        // デバッグ用
         foreach (var f in allFriends)
-            Debug.Log($"[Friend Init] {f.name}: {f.assignedCondition} / {f.assignedRoom}");
+            if (f != null) Debug.Log($"[Friend Init] {f.name}: {f.assignedCondition} / {f.assignedRoom}");
     }
-
     // 【変更】親友出現条件の判定
     FriendData CheckSpecialConditionFriend()
     {
+        if (allFriends == null) return null;
+
         foreach (var f in allFriends)
         {
+            // ★追加: nullチェック
+            if (f == null) continue;
+
             // 既に仲間、または教室配置のキャラはスキップ
             if (f.isRecruited || f.assignedCondition == ConditionType.Classroom) continue;
 
@@ -477,52 +632,41 @@ public class GameManager : MonoBehaviour
             switch (f.assignedCondition)
             {
                 case ConditionType.Ai_Fixed:
-                    // 男子接触8回以上 or 所持金5000以上
                     isMet = (playerStats.maleContactCount >= 8 || playerStats.gp >= 5000);
                     break;
-
-                case ConditionType.Conversation: // 会話: 男子接触4回以上
+                case ConditionType.Conversation:
                     isMet = (playerStats.maleContactCount >= 4);
                     break;
-
-                case ConditionType.Happiness: // 幸福: GP増幅マス5回以上
+                case ConditionType.Happiness:
                     isMet = (playerStats.gpIncreaseTileCount >= 5);
                     break;
-
-                case ConditionType.Unhappiness: // 不幸: GP減少マス3回以上
+                case ConditionType.Unhappiness:
                     isMet = (playerStats.gpDecreaseTileCount >= 3);
                     break;
-
-                case ConditionType.DiceOne: // ダイス: 1の目3回以上
+                case ConditionType.DiceOne:
                     isMet = (playerStats.diceOneCount >= 3);
                     break;
-
-                case ConditionType.Rich: // 金満: 3000 GP 以上
+                case ConditionType.Rich:
                     isMet = (playerStats.gp >= 3000);
                     break;
-
-                case ConditionType.Wasteful: // 浪費: 購買消費 4000 GP 以上
+                case ConditionType.Wasteful:
                     isMet = (playerStats.shopSpentTotal >= 4000);
                     break;
-
-                case ConditionType.Popularity: // 友達: 20人以上
+                case ConditionType.Popularity:
                     isMet = (playerStats.friends >= 20);
                     break;
-
-                case ConditionType.Steps: // 歩数: 合計80歩以上
+                case ConditionType.Steps:
                     isMet = (playerStats.totalSteps >= 80);
                     break;
-
-                case ConditionType.Solitude: // 孤独: ぼっち3連続
+                case ConditionType.Solitude:
                     isMet = (playerStats.soloPlayConsecutive >= 3);
                     break;
-
-                case ConditionType.StatusAll2: // ステータス: 全て2以上
+                case ConditionType.StatusAll2:
                     isMet = playerStats.IsAllStatsOver(2);
                     break;
             }
 
-            if (isMet) return f; // 条件を満たした最初の親友を返す
+            if (isMet) return f;
         }
         return null;
     }

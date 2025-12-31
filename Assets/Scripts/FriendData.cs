@@ -36,16 +36,55 @@ public enum FriendEffectType
 }
 
 [System.Serializable]
-public class FriendData
+[CreateAssetMenu(fileName = "NewFriend", menuName = "ScriptableObjects/FriendData")]
+public class FriendData : ScriptableObject
 {
-    public string name;
-    [TextArea] public string abilityDescription;
+    public string friendName;
+    public Sprite faceIcon;
     public bool isAi;
-    public FriendEffectType effectType; // The specific ability this friend has
 
-    // --- Dynamic Game Data (Assigned at runtime) ---
-    [HideInInspector] public ConditionType assignedCondition;
-    [HideInInspector] public string assignedRoom;
-    [HideInInspector] public bool isRecruited;
-    [HideInInspector] public bool isInfoRevealed;
+    // 実行時に変動するデータ
+    [System.NonSerialized] public bool isRecruited;      // 仲間にしたか
+    [System.NonSerialized] public ConditionType assignedCondition; // 割り当てられた条件
+    [System.NonSerialized] public string assignedRoom;   // 割り当てられた教室
+    [System.NonSerialized] public bool isHintRevealed;   // ★追加: ヒントが開示されたか
+
+    // ... (能力などの定義はそのまま) ...
+    public FriendEffectType effectType;
+
+    // ★追加: ヒント用テキスト生成
+    public string GetHintText()
+    {
+        string condText = "";
+        switch (assignedCondition)
+        {
+            case ConditionType.Classroom:
+                return $"{friendName} は【{assignedRoom}】にいるみたい。生徒手帳を持って行ってみよう。";
+            case ConditionType.Ai_Fixed:
+                return $"{friendName} は【男子と8回接触】か【所持金5000GP】で興味を持ってくれるみたい。";
+            case ConditionType.Conversation:
+                condText = "男子生徒と4回以上会話や接触をする"; break;
+            case ConditionType.Happiness:
+                condText = "GP増幅マス(プラス)に5回止まる"; break;
+            case ConditionType.Unhappiness:
+                condText = "GP減少マス(マイナス)に3回止まる"; break;
+            case ConditionType.DiceOne:
+                condText = "ダイスで「1」の目を3回出す"; break;
+            case ConditionType.Rich:
+                condText = "所持金を 3,000 GP 以上貯める"; break;
+            case ConditionType.Wasteful:
+                condText = "購買部で合計 4,000 GP 以上買い物する"; break;
+            case ConditionType.Popularity:
+                condText = "友達の数を 20人 以上にする"; break;
+            case ConditionType.Steps:
+                condText = "累計で 80歩 以上移動する"; break;
+            case ConditionType.Solitude:
+                condText = "イベントマスで「一人で遊ぶ」を3回連続で選ぶ"; break;
+            case ConditionType.StatusAll2:
+                condText = "全ステータス(コミュ/ギャル/レモン)を Lv2 以上にする"; break;
+            default:
+                return "まだ情報がないみたい……。";
+        }
+        return $"{friendName} は【{condText}】と、イベントマスで一人で遊んでいる時に会えるらしいよ！";
+    }
 }
