@@ -1,162 +1,138 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using System.Linq;
 
 public class BoardManager : MonoBehaviour
 {
-    [Header("--- Map Settings ---")]
+    [Header("--- Board Settings ---")]
     public GameObject tilePrefab;
-    public Transform boardParent;
-    public Transform playerPiece;
-    public int totalTiles = 48;
+    public Transform boardRoot;
+    public float tileSpacing = 1.1f;
+    public int tilesPerLine = 8;
 
-    // 外部から現在のマップ情報を参照するためのプロパティ
-    public string[] BoardLayout { get; private set; }
+    [Header("--- Tile Assets ---")]
+    public Sprite startSprite;
+    public Sprite goalSprite;
+    // タイルの色はTileData側で管理、またはここから渡す設計も可能
 
-    // 初期化処理
-    public void InitializeBoard(int currentGrade)
+    public List<string> BoardLayout { get; private set; }
+    public int totalTiles = 48; // 1フロアのマス数
+    private List<GameObject> spawnedTiles = new List<GameObject>();
+    private GameObject playerPiece;
+
+    public void InitializeBoard(int grade)
     {
-        // 既存のマスの削除
-        foreach (Transform child in boardParent) Destroy(child.gameObject);
+        foreach (var t in spawnedTiles) Destroy(t);
+        spawnedTiles.Clear();
 
-        BoardLayout = new string[totalTiles];
+        GenerateLayout(grade);
 
-        // 1. 固定マスの配置
-        // ★修正: 1年生の時だけ0番をStartにする。それ以外はNormal（通過点）
-        BoardLayout[0] = (currentGrade == 1) ? "Start" : "Normal";
-
-        BoardLayout[24] = "Middle"; // 中間地点
-
-        // 学年ごとのゴール・ショップ配置
-        if (currentGrade == 3)
+        for (int i = 0; i < BoardLayout.Count; i++)
         {
-            BoardLayout[totalTiles - 1] = "Goal";
-            BoardLayout[totalTiles - 2] = "Shop";
-        }
-        else
-        {
-            BoardLayout[totalTiles - 1] = "Shop";
-        }
+            GameObject tile = Instantiate(tilePrefab, boardRoot);
+            tile.name = $"Tile_{i}";
 
-        // 教室マスの配置 (2年生以上)
-        if (currentGrade >= 2)
-        {
-            int[] cIdx = { 5, 13, 21, 29, 37, 45 };
-            foreach (int i in cIdx)
-            {
-                if (i < totalTiles && string.IsNullOrEmpty(BoardLayout[i]))
-                    BoardLayout[i] = "Classroom";
-            }
+            int row = i / tilesPerLine;
+            int col = i % tilesPerLine;
+            if (row % 2 == 1) col = (tilesPerLine - 1) - col;
+
+            tile.transform.localPosition = new Vector3(col * tileSpacing, row * tileSpacing, 0);
+
+            SetupTileVisual(tile, BoardLayout[i], i);
+            spawnedTiles.Add(tile);
         }
+    }
 
-        // 2. ランダムマスの配置
-        List<string> p = new List<string>();
+    void GenerateLayout(int grade)
+    {
+        BoardLayout = new List<string>();
 
-        if (currentGrade == 1)
-        {
-            AddTiles(p, "Shop", 1);
-            AddTiles(p, "Male", 12); AddTiles(p, "Event", 12);
-            AddTiles(p, "FriendPlus", 8); AddTiles(p, "GPPlus", 6);
-            AddTiles(p, "GPMinus", 4); AddTiles(p, "FriendMinus", 2);
-        }
-        else
-        {
-            // 2,3年生用バランス
-            if (currentGrade == 2) AddTiles(p, "Shop", 1);
-            AddTiles(p, "GPPlus", 10); AddTiles(p, "FriendPlus", 8);
-            AddTiles(p, "Event", 12); AddTiles(p, "GPMinus", 4);
-            AddTiles(p, "Male", 3); AddTiles(p, "FriendMinus", 2);
-        }
-
-        // シャッフル
-        p = p.OrderBy(x => Random.value).ToList();
-
-        // 空きマスに埋める
-        int pIdx = 0;
         for (int i = 0; i < totalTiles; i++)
         {
-            if (string.IsNullOrEmpty(BoardLayout[i]))
+            // ▼▼▼ 修正箇所：2階以降の最初のマスを「イベントマス」にする ▼▼▼
+            if (i == 0)
             {
-                BoardLayout[i] = (pIdx < p.Count) ? p[pIdx++] : "Normal";
+                if (grade == 1)
+                {
+                    BoardLayout.Add("Start"); // 1階はスタート地点
+                }
+                else
+                {
+                    BoardLayout.Add("Event"); // 2,3階の最初はイベントマス（エラー回避）
+                }
             }
-        }
+            // ▲▲▲ 修正箇所終わり ▲▲▲
 
-        // 3. 視覚的な生成（スネイク配置）
-        GenerateVisualTiles();
-    }
-
-    void AddTiles(List<string> list, string type, int count)
-    {
-        for (int i = 0; i < count; i++) list.Add(type);
-    }
-
-    void GenerateVisualTiles()
-    {
-        int columns = 8; // 1行8マス
-        for (int visualIndex = 0; visualIndex < totalTiles; visualIndex++)
-        {
-            int row = visualIndex / columns;
-            int col = visualIndex % columns;
-
-            // スネイク変換: 奇数行は「右→左」なので論理インデックスを計算して取得
-            int logicalIndex = (row % 2 == 0) ? visualIndex : (row * columns) + (columns - 1 - col);
-
-            GameObject t = Instantiate(tilePrefab, boardParent);
-            t.name = $"Tile_{logicalIndex}_{BoardLayout[logicalIndex]}";
-
-            TileData td = t.GetComponent<TileData>();
-            if (td != null)
+            else if (i == totalTiles - 1) BoardLayout.Add("Goal");
+            else if (i == 24) BoardLayout.Add("Middle");
+            else if (i == 10 || i == 30) BoardLayout.Add("Shop");
+            else
             {
-                td.index = logicalIndex;
-                td.type = ConvertStr(BoardLayout[logicalIndex]);
-                td.UpdateVisuals();
+                int r = Random.Range(0, 100);
+                if (r < 25) BoardLayout.Add("GPPlus");
+                else if (r < 45) BoardLayout.Add("GPMinus");
+                else if (r < 60) BoardLayout.Add("FriendPlus");
+                else if (r < 70) BoardLayout.Add("FriendMinus");
+                else if (r < 85) BoardLayout.Add("Event");
+                else BoardLayout.Add("Male");
             }
         }
     }
 
-    // プレイヤーの駒を移動させる
-    public void MovePlayerPiece(int logicalIndex)
+    void SetupTileVisual(GameObject tileObj, string typeStr, int index)
     {
-        if (boardParent.childCount <= logicalIndex) return;
-
-        int columns = 8;
-        int row = logicalIndex / columns;
-        int col = logicalIndex % columns;
-        int visualIndex;
-
-        if (row % 2 == 0)
+        // 修正したTileDataのメソッドを呼び出す
+        TileData td = tileObj.GetComponent<TileData>();
+        if (td != null)
         {
-            visualIndex = logicalIndex;
+            td.index = index;
+            td.SetLabel(typeStr); // これでエラーCS1061は解消されます
+
+            // 文字列からEnumへの変換（TileDataの色分けを機能させるため）
+            switch (typeStr)
+            {
+                case "Start": td.type = TileType.Start; break;
+                case "Goal": td.type = TileType.Goal; break;
+                case "GPPlus": td.type = TileType.GP_Plus; break;
+                case "GPMinus": td.type = TileType.GP_Minus; break;
+                case "FriendPlus": td.type = TileType.Friend_Plus; break;
+                case "FriendMinus": td.type = TileType.Friend_Minus; break;
+                case "Event": td.type = TileType.Event; break;
+                case "Male": td.type = TileType.Boy; break; // Male -> Boy
+                case "Shop": td.type = TileType.Shop; break;
+                case "Middle": td.type = TileType.Normal; break; // 中間はNormal扱いでindex判定
+                default: td.type = TileType.Normal; break;
+            }
+
+            td.UpdateVisuals();
         }
         else
         {
-            int rowStart = row * columns;
-            visualIndex = rowStart + (columns - 1 - col);
-        }
-
-        if (visualIndex >= 0 && visualIndex < boardParent.childCount)
-        {
-            if (playerPiece != null)
-                playerPiece.position = boardParent.GetChild(visualIndex).position;
+            // TileDataがない場合のフォールバック（SpriteRenderer直変え）
+            SpriteRenderer sr = tileObj.GetComponent<SpriteRenderer>();
+            if (sr)
+            {
+                if (typeStr == "Start" && startSprite) sr.sprite = startSprite;
+                else if (typeStr == "Goal" && goalSprite) sr.sprite = goalSprite;
+                // 他の色設定などは必要に応じて追加
+            }
         }
     }
 
-    TileType ConvertStr(string s)
+    public void MovePlayerPiece(int tileIndex)
     {
-        switch (s)
+        if (spawnedTiles.Count == 0) return;
+        if (tileIndex >= spawnedTiles.Count) tileIndex = spawnedTiles.Count - 1;
+
+        if (playerPiece == null)
         {
-            case "Start": return TileType.Start;
-            case "Goal": return TileType.Goal;
-            case "Male": return TileType.Boy;
-            case "Event": return TileType.Event;
-            case "Shop": return TileType.Shop;
-            case "Classroom": return TileType.Classroom;
-            case "FriendPlus": return TileType.Friend_Plus;
-            case "FriendMinus": return TileType.Friend_Minus;
-            case "GPPlus": return TileType.GP_Plus;
-            case "GPMinus": return TileType.GP_Minus;
-            default: return TileType.Normal;
+            playerPiece = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            playerPiece.transform.localScale = Vector3.one * 0.5f;
+            playerPiece.GetComponent<Renderer>().material.color = Color.magenta;
+            Destroy(playerPiece.GetComponent<SphereCollider>());
         }
+
+        Vector3 targetPos = spawnedTiles[tileIndex].transform.position;
+        targetPos.z = -0.5f;
+        playerPiece.transform.position = targetPos;
     }
 }

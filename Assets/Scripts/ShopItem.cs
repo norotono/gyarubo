@@ -1,18 +1,27 @@
-using System;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using UnityEngine.Events;
 
-[Serializable]
-public class ShopItem
+public class ShopItem : MonoBehaviour
 {
-    public string itemName;
-    public int price;
-    public string description;
-    public Action onBuy;
+    [Header("UI References")]
+    public TextMeshProUGUI nameText;
+    public TextMeshProUGUI priceText;
+    public Image iconImage;
+    public Button purchaseButton;
 
-    public ShopItem(string name, int price, string desc, Action onBuyAction)
+    // ShopManagerから呼ばれる初期化メソッド
+    public void Setup(ItemData data, int price, UnityAction onClick)
     {
-        itemName = name;
-        this.price = price; // 価格反映バグ修正済み
-        description = desc;
-        onBuy = onBuyAction;
+        if (nameText) nameText.text = data.itemName;
+        if (priceText) priceText.text = $"{price:N0} GP";
+        if (iconImage && data.icon) iconImage.sprite = data.icon;
+
+        if (purchaseButton)
+        {
+            purchaseButton.onClick.RemoveAllListeners();
+            purchaseButton.onClick.AddListener(onClick);
+        }
     }
 }

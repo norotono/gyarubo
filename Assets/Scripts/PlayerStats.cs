@@ -1,70 +1,90 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-[Serializable]
 public class PlayerStats : MonoBehaviour
 {
-    // シングルトン参照
-    public static PlayerStats Instance;
+    public static PlayerStats Instance { get; private set; }
 
-    void Awake()
-    {
-        // シングルトンの設定（他からアクセスしやすくするため）
-        if (Instance == null) Instance = this;
-    }
-
-    // --- 基本資産 ---
-    public int gp = 300;
+    [Header("Resources")]
+    public int gp = 3000;
     public int friends = 5;
 
-    // --- 時間管理 ---
-    [Range(1, 3)] public int currentGrade = 1;
-    public int currentTurn = 1;
-    public int currentMonth = 4; // 4月スタート
+    [Header("Status")]
+    public int commuLv = 1;
+    public int galLv = 1;
+    public int lemonLv = 1;
+    public int currentGrade = 1;
+    public int currentMonth = 4;
 
-    // --- ステータス (Lv0-5) ---
-    public int commuLv = 0;
-    public int galLv = 0;
-    public int lemonLv = 0;
-
-    // --- 彼氏・男友達 ---
-    public int boyfriendCount = 0;
+    [Header("Counters")]
     public int maleFriendCount = 0;
-    public int boyfriendAbilityType = 0;
-
-    // --- 所持アイテム ---
-    public List<int> moveCards = new List<int>();
-    public int studentIdCount = 0;
-    public int present = 0;
-    public int eventForce = 0; // イベント強制アイテム
-
-    // --- シングルプレイ用: 卒業アルバム価格 ---
-    public int albumPrice = 1000;
-
-    // --- 各種カウンタ（親友出現条件用） ---
-    public int maleContactCount = 0;
-    public int gpIncreaseTileCount = 0;
-    public int gpDecreaseTileCount = 0;
-    public int diceOneCount = 0;
-    public int shopSpentTotal = 0;
+    public int boyfriendCount = 0;
     public int soloPlayConsecutive = 0;
-    public int totalSteps = 0;
 
-    // --- 給料計算メソッド ---
-    public int CalculateSalary(int shinyuCount)
+    [Header("Inventory")]
+    // 移動カードは数字(int)で管理。最大5枚
+    public List<int> moveCards = new List<int>();
+    public const int MaxMoveCards = 5;
+
+    // その他のアイテム（生徒手帳など）
+    public List<ItemData> otherItems = new List<ItemData>();
+
+    private void Awake()
     {
-        // 基本給100 + 友達x10 + 親友x50
-        return 100 + (friends * 10) + (shinyuCount * 50);
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
     }
 
-    // --- ステータス判定メソッド ---
-    public bool IsAllStatsOver(int value)
+    public int CalculateSalary(int shinyuCount)
     {
-        // 彼氏が3人以上なら全ステータス+1扱い（ハーレムボーナス）
-        int bonus = (boyfriendCount >= 3) ? 1 : 0;
-        return (commuLv + bonus) >= value &&
-               (galLv + bonus) >= value &&
-               (lemonLv + bonus) >= value;
+        return 3000 + (shinyuCount * 1000) + (galLv * 500);
+    }
+
+    // --- インベントリ操作 ---
+
+    // 移動カードが満タンか確認
+    public bool IsMoveCardFull()
+    {
+        return moveCards.Count >= MaxMoveCards;
+    }
+
+    // 移動カード追加
+    public void AddMoveCard(int steps)
+    {
+        if (moveCards.Count < MaxMoveCards)
+        {
+            moveCards.Add(steps);
+            moveCards.Sort(); // 整理整頓
+        }
+    }
+
+    // 移動カード削除（インデックス指定）
+    public void RemoveMoveCardAt(int index)
+    {
+        if (index >= 0 && index < moveCards.Count)
+        {
+            moveCards.RemoveAt(index);
+        }
+    }
+
+    // 汎用アイテム削除メソッド（GameManager等から呼ばれる）
+    public void RemoveItem(ItemData item)
+    {
+        if (item.itemType == ItemType.MoveCard)
+        {
+            // 移動カードの場合は数字が一致する最初のものを削除
+            if (moveCards.Contains(item.moveSteps))
+            {
+                moveCards.Remove(item.moveSteps);
+            }
+        }
+        else
+        {
+            // 通常アイテムの場合
+            if (otherItems.Contains(item))
+            {
+                otherItems.Remove(item);
+            }
+        }
     }
 }
