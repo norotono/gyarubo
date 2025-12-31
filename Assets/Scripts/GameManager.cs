@@ -3,286 +3,103 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using System.Linq; // ランダム割り当てに必要
+using UnityEngine.Events;
+using System.Linq;
 
 public class GameManager : MonoBehaviour
 {
-    [Header("--- Managers ---")]
+    [Header("--- Managers (Attach Scripts) ---")]
     public BoardManager boardManager;
     public ShopManager shopManager;
     public EventManager eventManager;
-    public PhoneUIManager phoneUI;
 
-    [Header("--- UI References ---")]
+    [Header("--- Game Settings ---")]
+    [Range(1, 3)]
+    public int currentGrade = 1;
+    public float moveSpeed = 0.3f;
+
+    [Header("--- References ---")]
+    public PlayerStats playerStats;
+    public PhoneUIManager phoneUI;
     public Button diceButton;
     public Image diceImage;
     public Sprite[] diceSprites;
-    public TextMeshProUGUI dateText, assetText;
+
+    [Header("--- Main UI ---")]
+    public TextMeshProUGUI dateText;
+    public TextMeshProUGUI assetText;
+    public TextMeshProUGUI statusText;
 
     [Header("--- Data ---")]
-    public List<FriendData> allFriends; // 親友全10名を登録
-    public ItemData normalMoveCard;     // リカが生成する「移動カード(通常)」のデータ参照
+    public List<FriendData> allFriends = new List<FriendData>();
+    public List<string> floor2Rooms = new List<string> { "2-A", "2-B", "2-C", "理科室", "美術室" };
 
-    private PlayerStats stats;
+    // 内部変数
     private int currentTileIndex = 0;
     private bool isMoving = false;
+    private int middleTileIndex = 24;
 
-    // --- 初期化 ---
-    void Start()
+    private void Start()
     {
-        stats = PlayerStats.Instance;
+        if (playerStats == null) playerStats = PlayerStats.Instance;
 
-        // 親友条件のランダム割り当て (アイ以外)
-        AssignFriendConditions();
+        // 1. 友達データの初期化
+        InitializeFriends();
 
-        // 各マネージャー初期化
-        if (phoneUI) phoneUI.Initialize(this);
-        if (boardManager) boardManager.InitializeBoard(stats.currentGrade);
-        if (shopManager) shopManager.SetupItems(stats.currentGrade);
+        // 2. マップ生成
+        boardManager.InitializeBoard(currentGrade);
 
-        // プレイヤー位置初期化
+        // 3. ショップデータ初期化
+        shopManager.InitializeShopItems(currentGrade, playerStats);
+
+        // 4. プレイヤー配置
         currentTileIndex = 0;
-        StartCoroutine(InitPosition());
-        UpdateMainUI();
+        StartCoroutine(InitPlayerPos());
 
+        // 5. UI更新
+        UpdateMainUI();
         if (diceButton) diceButton.onClick.AddListener(OnDiceClicked);
     }
 
-    IEnumerator InitPosition()
+    IEnumerator InitPlayerPos()
     {
         yield return null;
-        if (boardManager) boardManager.MovePlayerPiece(0);
+        boardManager.MovePlayerPiece(0);
     }
 
-    // --- 親友条件の割り当て ---
-    // --- 1. 親友条件の割り当て (ランダム仕様対応) ---
-    void AssignFriendConditions()
-    {
-        // ランダム割り当て用の条件プール
-        List<ScoutConditionType> pool = new List<ScoutConditionType>
-        {
-            ScoutConditionType.MaleContact, ScoutConditionType.HighGP_Tile,
-            ScoutConditionType.LowGP_Tile,  ScoutConditionType.DiceOne,
-            ScoutConditionType.RichGP,      ScoutConditionType.HighSpend,
-            ScoutConditionType.HighFriends, ScoutConditionType.HighSteps,
-            ScoutConditionType.Solitude,    ScoutConditionType.HighStatus
-        };
-        pool = pool.OrderBy(x => Random.value).ToList();
+    // --- ダイス & 移動処理 ---
 
-        // アイ(固定枠)以外の9人をシャッフル
-        var randomFriends = allFriends.Where(f => f.effectType != FriendEffectType.ScoreDoubler).OrderBy(x => Random.value).ToList();
-
-        for (int i = 0; i < randomFriends.Count; i++)
-        {
-            FriendData f = randomFriends[i];
-            f.isRecruited = false;
-
-            if (i < 5)
-            {
-                // A: 教室タイプ (5名)
-                f.conditionType = ScoutConditionType.Classroom;
-            }
-            else
-            {
-                // B: 特殊条件タイプ (4名)
-                f.conditionType = pool[i - 5];
-
-                // 閾値設定 (仕様書準拠)
-                switch (f.conditionType)
-                {
-                    case ScoutConditionType.MaleContact: f.conditionValue = 4; break;
-                    case ScoutConditionType.HighGP_Tile: f.conditionValue = 5; break;
-                    case ScoutConditionType.LowGP_Tile: f.conditionValue = 3; break;
-                    case ScoutConditionType.DiceOne: f.conditionValue = 3; break;
-                    case ScoutConditionType.RichGP: f.conditionValue = 3000; break;
-                    case ScoutConditionType.HighSpend: f.conditionValue = 4000; break;
-                    case ScoutConditionType.HighFriends: f.conditionValue = 20; break;
-                    case ScoutConditionType.HighSteps: f.conditionValue = 80; break;
-                    case ScoutConditionType.Solitude: f.conditionValue = 3; break;
-                    case ScoutConditionType.HighStatus: f.conditionValue = 2; break;
-                }
-            }
-        }
-
-        // アイ (固定)
-        var ai = allFriends.FirstOrDefault(f => f.effectType == FriendEffectType.ScoreDoubler);
-        if (ai != null)
-        {
-            ai.isRecruited = false;
-            ai.conditionType = ScoutConditionType.Fixed_Ai;
-            ai.conditionValue = 0;
-        }
-    }
-
-    // --- 2. スカウト判定 (イベントマス用) ---
-    public FriendData CheckScoutableFriend()
-    {
-        PlayerStats s = PlayerStats.Instance;
-        foreach (var f in allFriends)
-        {
-            if (f.isRecruited) continue;
-            if (f.conditionType == ScoutConditionType.Classroom) continue; // 教室タイプはイベントマスでは出ない
-
-            bool met = false;
-            switch (f.conditionType)
-            {
-                case ScoutConditionType.Fixed_Ai:
-                    if (s.maleContactCount >= 8 || s.gp >= 5000) met = true; break;
-                case ScoutConditionType.MaleContact:
-                    if (s.maleContactCount >= f.conditionValue) met = true; break;
-                case ScoutConditionType.HighGP_Tile:
-                    if (s.gpPlusTileCount >= f.conditionValue) met = true; break;
-                case ScoutConditionType.LowGP_Tile:
-                    if (s.gpMinusTileCount >= f.conditionValue) met = true; break;
-                case ScoutConditionType.DiceOne:
-                    if (s.diceOneCount >= f.conditionValue) met = true; break;
-                case ScoutConditionType.RichGP:
-                    if (s.gp >= f.conditionValue) met = true; break;
-                case ScoutConditionType.HighSpend:
-                    if (s.shopSpendTotal >= f.conditionValue) met = true; break;
-                case ScoutConditionType.HighFriends:
-                    if (s.friends >= f.conditionValue) met = true; break;
-                case ScoutConditionType.HighSteps:
-                    if (s.totalSteps >= f.conditionValue) met = true; break;
-                case ScoutConditionType.Solitude:
-                    if (s.soloPlayConsecutive >= f.conditionValue) met = true; break;
-                case ScoutConditionType.HighStatus:
-                    if (s.commuLv >= f.conditionValue && s.galLv >= f.conditionValue && s.lemonLv >= f.conditionValue) met = true; break;
-            }
-            if (met) return f;
-        }
-        return null;
-    }
-
-    // --- 3. 親友加入処理 (アイの能力対応) ---
-    public void RecruitFriend(FriendData f)
-    {
-        if (f == null) return;
-        f.isRecruited = true;
-
-        if (f.effectType == FriendEffectType.ScoreDoubler)
-        {
-            stats.friends *= 2;
-            AddLog($"【最強】{f.characterName}が加入！ 友達数が2倍になりました！");
-        }
-        else
-        {
-            AddLog($"{f.characterName} が親友になりました！");
-        }
-        UpdateMainUI();
-    }
-
-    // --- 4. アイテム使用処理 (全アイテム対応) ---
-    public void UseItem(ItemData item)
-    {
-        if (isMoving)
-        {
-            AddLog("移動中はアイテムを使えません。");
-            return;
-        }
-
-        AddLog($"アイテム使用: {item.itemName}");
-        stats.RemoveItem(item);
-
-        switch (item.itemType)
-        {
-            case ItemType.MoveCard_Fixed: // 固定移動カード
-                StartCoroutine(TurnSequence(item.moveSteps));
-                break;
-
-            case ItemType.MoveCard_RandomShop: // 念のため
-                StartCoroutine(TurnSequence(-2));
-                break;
-
-            case ItemType.MoveCard_HighLow: // 倍額カード
-                StartCoroutine(TurnSequence(-3));
-                break;
-
-            case ItemType.Recovery:
-                stats.gp += item.effectValue;
-                AddLog($"GPが {item.effectValue} 回復しました！");
-                break;
-
-            case ItemType.StatusUp:
-                if (item.targetStatus == TargetStatus.All) { stats.commuLv++; stats.galLv++; stats.lemonLv++; }
-                else if (item.targetStatus == TargetStatus.Commu) stats.commuLv++;
-                else if (item.targetStatus == TargetStatus.Gal) stats.galLv++;
-                else if (item.targetStatus == TargetStatus.Lemon) stats.lemonLv++;
-                AddLog("ステータスがアップしました！");
-                break;
-
-            case ItemType.FriendBoost:
-                stats.friends += item.effectValue;
-                AddLog($"友達が {item.effectValue}人 増えました！");
-                break;
-
-            case ItemType.DynamicPrice:
-                stats.friends += item.effectValue;
-                stats.gradAlbumBuyCount++;
-                AddLog($"アルバム効果で友達 +{item.effectValue}人！");
-                break;
-
-            case ItemType.ForceEvent:
-                AddLog("イベント強制(未実装)");
-                break;
-        }
-        UpdateMainUI();
-    }
-
-
-    // --- ゲーム進行 ---
-    void OnDiceClicked()
+    public void OnDiceClicked()
     {
         if (isMoving) return;
-
-        // カオルの能力: ダイスリロール (簡易実装: 確率で良い目が出るなど、今回は通常通り)
-        StartCoroutine(TurnSequence(-1));
+        StartCoroutine(RollDiceSequence());
     }
 
-    // mode: -1=Dice, -2=RandomCard, -3=HighCard, >0=Fixed
-    IEnumerator TurnSequence(int mode)
+    IEnumerator RollDiceSequence()
     {
         isMoving = true;
         diceButton.interactable = false;
 
-        int steps = 0;
-
-        if (mode == -1 || mode == -2)
+        float timer = 0f;
+        while (timer < 0.5f)
         {
-            // ダイス演出
-            float t = 0;
-            while (t < 0.5f)
-            {
-                if (diceImage) diceImage.sprite = diceSprites[Random.Range(0, 6)];
-                yield return new WaitForSeconds(0.05f);
-                t += 0.05f;
-            }
-            steps = Random.Range(1, 7);
-            if (diceImage) diceImage.sprite = diceSprites[steps - 1];
-
-            // 統計
-            if (mode == -1)
-            {
-                stats.totalSteps += steps;
-                if (steps == 1) stats.diceOneCount++;
-            }
-            yield return new WaitForSeconds(0.5f);
-        }
-        else if (mode == -3) // High Card
-        {
-            steps = Random.Range(4, 7);
-            AddLog($"Highカード発動！ {steps}マス進みます。");
-        }
-        else if (mode > 0) // 固定移動
-        {
-            steps = mode;
-            AddLog($"カード効果で {steps}マス進みます。");
+            if (diceImage && diceSprites.Length > 0)
+                diceImage.sprite = diceSprites[Random.Range(0, 6)];
+            yield return new WaitForSeconds(0.05f);
+            timer += 0.05f;
         }
 
-        yield return StartCoroutine(MovePlayer(steps));
+        int result = Random.Range(1, 7);
+        if (diceImage && diceSprites.Length >= 6)
+            diceImage.sprite = diceSprites[result - 1];
 
-        isMoving = false;
-        diceButton.interactable = true;
+        // ダイスボーナス
+        if (result == 5) { playerStats.gp += 100; AddLog("ボーナス: GP+100"); }
+        if (result == 6) { playerStats.friends += 1; AddLog("ボーナス: 友達+1"); }
+        UpdateMainUI();
+
+        yield return new WaitForSeconds(0.5f);
+        yield return StartCoroutine(MovePlayer(result));
     }
 
     IEnumerator MovePlayer(int steps)
@@ -290,154 +107,238 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i < steps; i++)
         {
             currentTileIndex++;
-            if (boardManager) boardManager.MovePlayerPiece(currentTileIndex);
 
-            // 通過チェック: 購買部
-            string tileType = GetTileType(currentTileIndex);
-            if (tileType == "Shop" && i < steps - 1)
+            // 進級・ゴール判定
+            if (currentTileIndex >= boardManager.totalTiles)
             {
-                // エミの能力: 割引
-                bool hasEmi = HasFriendEffect(FriendEffectType.ShopDiscount);
-                AddLog("購買部を通過します。");
-                yield return StartCoroutine(shopManager.OpenShop(hasEmi)); // 通過でも割引有効ならtrue
-            }
-
-            yield return new WaitForSeconds(0.3f);
-        }
-        OnTileReached(currentTileIndex);
-    }
-
-    // --- マス到着処理 (親友能力の実装) ---
-    // ※この関数が2つあるとエラーになります。1つにしてください。
-    void OnTileReached(int index)
-    {
-        string type = GetTileType(index);
-
-        // 親友能力チェック
-        bool doubleEffect = HasFriendEffect(FriendEffectType.DoubleTileEffect);
-        bool nullifyMinus = HasFriendEffect(FriendEffectType.NullifyGPMinus);
-        bool badToGP = HasFriendEffect(FriendEffectType.BadToGP);
-        bool gpBoost = HasFriendEffect(FriendEffectType.GPMultiplier);
-        bool hasEmi = HasFriendEffect(FriendEffectType.ShopDiscount);
-
-        int multiplier = doubleEffect ? 2 : 1;
-
-        switch (type)
-        {
-            case "GPPlus":
-                int gain = (stats.currentGrade * 100) * multiplier;
-                if (gpBoost) gain = (int)(gain * 1.5f);
-                stats.gp += gain;
-                stats.gpPlusTileCount++;
-                AddLog($"バイト代が入った！ +{gain}GP");
-                break;
-
-            case "GPMinus":
-                int loss = (stats.currentGrade * 100) * multiplier;
-                if (nullifyMinus)
+                if (currentGrade < 3)
                 {
-                    loss = 0;
-                    AddLog("サオリの効果で出費を回避しました！");
-                }
-                else if (badToGP)
-                {
-                    stats.gp += loss;
-                    AddLog($"ノアの効果で逆に {loss}GP 儲かりました！");
-                    loss = 0;
-                }
+                    currentGrade++;
+                    currentTileIndex = 0;
+                    AddLog($"進級！ {currentGrade}年生になりました。");
 
-                if (loss > 0)
-                {
-                    stats.gp = Mathf.Max(0, stats.gp - loss);
-                    stats.gpMinusTileCount++;
-                    AddLog($"出費がかさんだ... -{loss}GP");
-                }
-                break;
+                    boardManager.InitializeBoard(currentGrade);
+                    shopManager.InitializeShopItems(currentGrade, playerStats); // 商品更新
+                    yield return null;
 
-            case "Shop":
-                AddLog("購買部に到着しました。");
-                StartCoroutine(shopManager.OpenShop(true || hasEmi)); // 停車時割引
-                break;
-
-            case "Event":
-                FriendData target = CheckScoutableFriend();
-                if (target != null)
-                {
-                    RecruitFriend(target);
+                    boardManager.MovePlayerPiece(0);
+                    UpdateMainUI();
+                    yield return new WaitForSeconds(moveSpeed);
+                    continue;
                 }
                 else
                 {
-                    AddLog("イベント発生 (内容はランダム)");
+                    currentTileIndex = boardManager.totalTiles - 1;
+                    boardManager.MovePlayerPiece(currentTileIndex);
+                    AddLog("ゲーム終了！");
+                    // ここにリザルト処理を入れる予定
+                    break;
                 }
+            }
+
+            boardManager.MovePlayerPiece(currentTileIndex);
+            UpdateMainUI();
+
+            // 通過時の購買チェック
+            if (boardManager.BoardLayout[currentTileIndex] == "Shop" && i < steps - 1)
+            {
+                AddLog("購買部を通過します。");
+                yield return StartCoroutine(shopManager.OpenShopSequence(playerStats, false));
+                UpdateMainUI(); // 買い物後の更新
+            }
+
+            // 中間地点チェック
+            if (currentTileIndex == middleTileIndex)
+            {
+                AddLog("中間イベント発生！");
+                break;
+            }
+
+            yield return new WaitForSeconds(moveSpeed);
+        }
+
+        OnTileReached(currentTileIndex);
+    }
+
+    // --- マス到達時の処理 ---
+
+    void OnTileReached(int tileIndex)
+    {
+        string type = boardManager.BoardLayout[tileIndex];
+
+        // 親友効果のチェック
+        int mult = 1;
+        if (type != "Middle" && type != "Shop" && HasFriendEffect(FriendEffectType.DoubleTileEffect)) mult = 2;
+
+        switch (type)
+        {
+            case "Event":
+                HandleEventTile();
+                return; // EndTurnはイベント後に呼ぶ
+
+            case "Male":
+                HandleMaleTile();
+                return;
+
+            case "Middle":
+                HandleMiddleTile();
+                return;
+
+            case "Shop":
+                Debug.Log("【購買部】ピッタリ停止！ 20% OFF!");
+                // 購買コルーチン開始
+                StartCoroutine(RunShopTileSequence());
+                return;
+
+            case "GPPlus":
+                int gVal = (currentGrade * 150 + playerStats.galLv * 100) * mult;
+                AddGP(gVal);
+                playerStats.gpIncreaseTileCount++;
+                break;
+
+            case "GPMinus":
+                if (HasFriendEffect(FriendEffectType.NullifyGPMinus)) break;
+                if (HasFriendEffect(FriendEffectType.BadEventToGP)) { AddGP(100 * mult); break; }
+                int gLoss = (currentGrade * 100) * mult;
+                playerStats.gp = Mathf.Max(0, playerStats.gp - gLoss);
+                playerStats.gpDecreaseTileCount++;
+                break;
+
+            case "FriendPlus":
+                int fVal = (currentGrade * 1 + playerStats.commuLv) * mult;
+                AddFriend(fVal);
+                break;
+
+            case "FriendMinus":
+                if (HasFriendEffect(FriendEffectType.BadEventToGP)) { AddGP(100 * mult); break; }
+                int fLoss = 1 * mult;
+                if (playerStats.friends > 0) playerStats.friends -= fLoss;
                 break;
         }
 
         EndTurn();
     }
 
+    // --- イベントハンドリング ---
+
+    IEnumerator RunShopTileSequence()
+    {
+        // 親友効果があれば常に割引
+        bool discount = true; // マス停止なら割引
+        yield return StartCoroutine(shopManager.OpenShopSequence(playerStats, discount));
+        EndTurn();
+    }
+
     void HandleEventTile()
     {
-        // 1. 同伴 (未実装)
+        string[] labels = { "同伴", "親友スカウト", "一人で遊ぶ" };
+        UnityAction[] actions = new UnityAction[3];
+
+        // 1. 同伴
+        bool canDate = (playerStats.boyfriendCount > 0 || playerStats.maleFriendCount > 0);
+        actions[0] = () => { playerStats.soloPlayConsecutive = 0; EndTurn(); };
+
         // 2. 親友スカウト
-        FriendData target = CheckScoutableFriend();
-        if (target != null)
-        {
-            RecruitFriend(target);
-        }
-        else
-        {
-            // 3. ランダムイベント
-            AddLog("イベント発生 (内容はランダム)");
-        }
+        FriendData target = CheckSpecialConditionFriend();
+        actions[1] = () => {
+            playerStats.soloPlayConsecutive = 0;
+            if (target != null) RecruitFriend(target);
+            EndTurn();
+        };
+
+        // 3. 一人で遊ぶ（ルーレット）
+        actions[2] = () => {
+            playerStats.soloPlayConsecutive++;
+            StartCoroutine(RunRoulette());
+        };
+
+        eventManager.ShowChoicePanel("イベント", labels, actions);
+        eventManager.SetButtonInteractable(0, canDate);
+        eventManager.SetButtonInteractable(1, target != null && !canDate);
     }
+
+    void HandleMaleTile()
+    {
+        string[] labels = { "情報", "友達になる", "会話 (GP+300)" };
+        UnityAction[] actions = new UnityAction[3];
+
+        actions[0] = () => { /* 情報処理 */ EndTurn(); };
+        actions[1] = () => { playerStats.maleFriendCount++; EndTurn(); };
+        actions[2] = () => { AddGP(300); EndTurn(); };
+
+        eventManager.ShowChoicePanel("男子生徒", labels, actions);
+    }
+
+    void HandleMiddleTile()
+    {
+        string[] labels = { "GP +800", "親密度 +40", "モブ昇格" };
+        UnityAction[] actions = new UnityAction[3];
+
+        actions[0] = () => { AddGP(800); EndTurn(); };
+        actions[1] = () => { playerStats.present += 40; EndTurn(); }; // 仮
+        actions[2] = () => { EndTurn(); };
+
+        eventManager.ShowChoicePanel("中間地点", labels, actions);
+    }
+
+    IEnumerator RunRoulette()
+    {
+        bool protection = HasFriendEffect(FriendEffectType.BadEventToGP);
+        yield return StartCoroutine(eventManager.PlayRoulette(playerStats, protection));
+        EndTurn();
+    }
+
+    // --- ターン終了・補助 ---
 
     void EndTurn()
     {
-        // レナ: 毎ターン友達+1
-        if (HasFriendEffect(FriendEffectType.AutoFriend))
-        {
-            stats.friends++;
-        }
+        int shinyu = allFriends.Count(f => f.isRecruited);
+        playerStats.gp += playerStats.CalculateSalary(shinyu);
+        if (HasFriendEffect(FriendEffectType.AutoFriend)) AddFriend(1);
 
-        // リカ: 12ターン毎にカード生成
-        if (HasFriendEffect(FriendEffectType.CardGenerator))
-        {
-            if (stats.turnCount > 0 && stats.turnCount % 12 == 0)
-            {
-                if (!stats.IsMoveCardFull() && normalMoveCard != null)
-                {
-                    stats.moveCards.Add(normalMoveCard);
-                    AddLog("リカが移動カードを作ってくれました！");
-                }
-            }
-        }
+        playerStats.currentTurn++;
+        playerStats.currentMonth++;
+        if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
 
-        stats.turnCount++;
         UpdateMainUI();
-    }
-
-    // --- 補助メソッド ---
-    string GetTileType(int index)
-    {
-        if (boardManager != null && boardManager.BoardLayout != null && index < boardManager.BoardLayout.Count)
-            return boardManager.BoardLayout[index];
-        return "Normal";
-    }
-
-    bool HasFriendEffect(FriendEffectType type)
-    {
-        return allFriends.Any(f => f.isRecruited && f.effectType == type);
+        isMoving = false;
+        diceButton.interactable = true;
     }
 
     void UpdateMainUI()
     {
-        if (dateText) dateText.text = $"{stats.currentGrade}年";
-        if (assetText) assetText.text = $"GP: {stats.gp:N0}\n友: {stats.friends}人";
+        if (shopManager.IsShopOpen) shopManager.RefreshButtons(playerStats.gp); // ショップが開いていれば更新
+
+        // 季節の仮計算
+        int monthOffset = currentTileIndex / 4;
+        playerStats.currentMonth = 4 + monthOffset;
+        if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
+
+        if (dateText) dateText.text = $"{currentGrade}年目 {playerStats.currentMonth}月";
+        if (assetText) assetText.text = $"友: {playerStats.friends}人\nGP: {playerStats.gp:N0}";
+        if (statusText) statusText.text = $"コミュ力: Lv{playerStats.commuLv}\nギャル力: Lv{playerStats.galLv}\nレモン力: Lv{playerStats.lemonLv}";
     }
 
-    void AddLog(string msg)
+    // --- 補助メソッド ---
+    void AddLog(string msg) { Debug.Log(msg); if (phoneUI) phoneUI.AddLog(msg); }
+    void AddGP(int v) { if (HasFriendEffect(FriendEffectType.GPMultiplier)) v = (int)(v * 1.5f); playerStats.gp += v; }
+    void AddFriend(int v) { playerStats.friends += v; }
+    void RecruitFriend(FriendData f) { f.isRecruited = true; if (f.effectType == FriendEffectType.DoubleScoreOnJoin) playerStats.friends *= 2; }
+    bool HasFriendEffect(FriendEffectType t) { return allFriends.Any(f => f.isRecruited && f.effectType == t); }
+
+    void InitializeFriends()
     {
-        Debug.Log(msg);
-        if (phoneUI) phoneUI.AddLog(msg);
+        foreach (var f in allFriends) { f.isRecruited = false; f.assignedCondition = ConditionType.None; }
+        // 簡易実装：ランダム割り当てロジックは必要に応じてここに復活させる
+    }
+
+    FriendData CheckSpecialConditionFriend()
+    {
+        // 簡易実装：孤立条件のみチェック
+        foreach (var f in allFriends)
+        {
+            if (!f.isRecruited && f.assignedCondition == ConditionType.Solitude && playerStats.soloPlayConsecutive >= 3) return f;
+        }
+        return null;
     }
 }

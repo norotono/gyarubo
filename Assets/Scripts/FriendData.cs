@@ -1,52 +1,51 @@
 using UnityEngine;
 
+// Condition types for friend spawning
+public enum ConditionType
+{
+    None,
+    Ai_Fixed,       // Fixed condition for Ai
+    Classroom,      // Appears in classroom
+    // --- Randomly assigned conditions ---
+    Conversation,   // Talk to boys 4+ times
+    Happiness,      // Land on GP+ 5+ times
+    Unhappiness,    // Land on GP- 3+ times
+    DiceOne,        // Roll a '1' 3+ times
+    Rich,           // Have 3000+ GP
+    Wasteful,       // Spend 4000+ GP at shop
+    Popularity,     // Have 20+ Friends
+    Steps,          // Total steps 80+
+    Solitude,       // Select 'Play Alone' 3 times in a row
+    StatusAll2      // All stats Lv2+
+}
+
+// Unique effects for each friend
 public enum FriendEffectType
 {
-    ScoreDoubler,       // アイ: 加入時スコア2倍
-    GPMultiplier,       // ミレイ: GP獲得1.5倍
-    ShopDiscount,       // エミ: 購買20%OFF
-    DiceReroll,         // カオル: ダイスリロール(未実装)
-    DoubleTileEffect,   // ユナ: マス効果2回
-    BadToGP,            // ノア: 不幸をGP変換
-    AutoFriend,         // レナ: 毎ターン友達+1
-    NullifyGPMinus,     // サオリ: GP減少無効
-    MobPromo100,        // マキ: モブ昇格100%(イベント用)
-    CardGenerator,      // リカ: 12ターン毎にカード生成
-    None                // 効果なし
+    None,
+    DoubleScoreOnJoin, // Ai: Doubles current score on join
+    GPMultiplier,      // Mirei: GP gain x1.5
+    ShopDiscount,      // Emi: Shop 20% OFF
+    DiceReroll,        // Kaoru: Can reroll dice (Not fully implemented yet)
+    DoubleTileEffect,  // Yuna: Tile effects x2
+    BadEventToGP,      // Noah: Convert bad events/decreases to GP gain
+    AutoFriend,        // Rena: +1 Friend every turn
+    NullifyGPMinus,    // Saori: Nullify GP decrease
+    MobFriendPromote,  // Maki: 100% promotion chance in events
+    CardGeneration     // Rika: Generate move card every 12 turns
 }
 
-// 出現条件の種類
-public enum ScoutConditionType
+[System.Serializable]
+public class FriendData
 {
-    Fixed_Ai,       // アイ専用 (男子8回 or GP5000)
-    Classroom,      // 教室 (生徒手帳が必要)
-    // --- ランダム割り当て用 ---
-    MaleContact,    // 会話: 男子接触
-    HighGP_Tile,    // 幸福: GP増マス
-    LowGP_Tile,     // 不幸: GP減マス
-    DiceOne,        // ダイス: 1の目
-    RichGP,         // 金満: 所持金
-    HighSpend,      // 浪費: 購買額
-    HighFriends,    // 友達: 人数
-    HighSteps,      // 歩数: 合計移動
-    Solitude,       // 孤独: ソロプレイ
-    HighStatus,     // ステータス: 全ステ
-    None
-}
+    public string name;
+    [TextArea] public string abilityDescription;
+    public bool isAi;
+    public FriendEffectType effectType; // The specific ability this friend has
 
-[CreateAssetMenu(fileName = "NewFriend", menuName = "Gyarubo/FriendData")]
-public class FriendData : ScriptableObject
-{
-    public string characterName;
-    [TextArea] public string introduction;
-    public Sprite faceIcon;
-
-    [Header("Ability")]
-    public FriendEffectType effectType;
-    public int baseScore = 10;
-
-    [Header("Runtime State (自動設定)")]
-    public bool isRecruited = false;
-    public ScoutConditionType conditionType;
-    public int conditionValue;
+    // --- Dynamic Game Data (Assigned at runtime) ---
+    [HideInInspector] public ConditionType assignedCondition;
+    [HideInInspector] public string assignedRoom;
+    [HideInInspector] public bool isRecruited;
+    [HideInInspector] public bool isInfoRevealed;
 }

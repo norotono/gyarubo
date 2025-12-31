@@ -1,157 +1,129 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
+using TMPro; // TextMeshProを使用
 using System.Collections.Generic;
 
 public class PhoneUIManager : MonoBehaviour
 {
-    [Header("--- Main Screen ---")]
+    [Header("Areas")]
+    public GameObject diceArea;       // ダイスボタンなどがあるエリア
+    public GameObject dialogScroll;   // 会話や選択肢を表示するエリア
+    public GameObject menuArea;       // 下部メニューエリア
+
+    [Header("Item Menu Elements")]
+    public GameObject itemPanel;      // アイテム一覧のパネル全体
+    public Transform itemListRoot;    // アイテムボタンを並べる親オブジェクト
+    public GameObject itemButtonPrefab; // 生成するボタンのプレハブ
+
+    [Header("Text Components")]
     public TextMeshProUGUI logText;
-    public ScrollRect scrollRect;
+    public TextMeshProUGUI dialogText;
+    public Transform choiceRoot;      // 選択肢ボタンの親オブジェクト
+    public GameObject choiceButtonPrefab;
 
-    [Header("--- Menu Buttons ---")]
-    public Button btnFriend;
-    public Button btnItem;
-    public Button btnInfo;
-    public Button btnBoy;
+    // --- モード切替 ---
 
-    [Header("--- Sub Panels ---")]
-    public GameObject subPanelRoot;
-    public GameObject friendListPanel;
-    public GameObject itemListPanel;
-    public GameObject infoPanel;
-    public TextMeshProUGUI infoText;
-
-    [Header("--- Prefabs & Roots ---")]
-    public GameObject listItemPrefab;
-    public Transform listContentRoot;
-
-    private GameManager gameManager;
-
-    public void Initialize(GameManager gm)
+    public void ShowDiceMode()
     {
-        gameManager = gm;
-        // 各ボタンに機能を割り当て
-        if (btnFriend) btnFriend.onClick.AddListener(() => { OpenSubPanel(friendListPanel); RefreshFriendList(); });
-        if (btnItem) btnItem.onClick.AddListener(() => { OpenSubPanel(itemListPanel); RefreshItemList(); });
-        if (btnInfo) btnInfo.onClick.AddListener(() => { OpenSubPanel(infoPanel); UpdateInfoText(); });
-        if (btnBoy) btnBoy.onClick.AddListener(() => AddLog("男子・彼氏機能は準備中です。"));
-
-        CloseSubPanels();
+        if (diceArea) diceArea.SetActive(true);
+        if (dialogScroll) dialogScroll.SetActive(false);
+        if (itemPanel) itemPanel.SetActive(false);
+        if (menuArea) menuArea.SetActive(true);
     }
 
+    public void ShowDialogMode(string message)
+    {
+        if (diceArea) diceArea.SetActive(false);
+        if (dialogScroll) dialogScroll.SetActive(true);
+        if (itemPanel) itemPanel.SetActive(false); // ダイアログ中はアイテム欄を閉じる
+
+        if (dialogText) dialogText.text = message;
+
+        // 既存の選択肢をクリア
+        foreach (Transform child in choiceRoot) Destroy(child.gameObject);
+    }
+
+    // 外部からログを追加するための関数
     public void AddLog(string message)
     {
-        if (logText == null) return;
-        logText.text = $"> {message}\n" + logText.text;
-        // 文字数制限
-        if (logText.text.Length > 2000) logText.text = logText.text.Substring(0, 2000);
-    }
-
-    public void CloseSubPanels()
-    {
-        if (subPanelRoot) subPanelRoot.SetActive(false);
-        if (friendListPanel) friendListPanel.SetActive(false);
-        if (itemListPanel) itemListPanel.SetActive(false);
-        if (infoPanel) infoPanel.SetActive(false);
-    }
-
-    void OpenSubPanel(GameObject targetPanel)
-    {
-        CloseSubPanels();
-        if (subPanelRoot) subPanelRoot.SetActive(true);
-        if (targetPanel) targetPanel.SetActive(true);
-    }
-
-    void ClearList()
-    {
-        foreach (Transform child in listContentRoot) Destroy(child.gameObject);
-    }
-
-    // --- 親友リスト表示 ---
-    void RefreshFriendList()
-    {
-        ClearList();
-        if (gameManager == null || gameManager.allFriends == null) return;
-
-        foreach (var friend in gameManager.allFriends)
+        if (logText != null)
         {
-            if (friend.isRecruited)
+            // 新しいログを上に追加していく
+            logText.text = $"> {message}\n" + logText.text;
+
+            // 文字数が多すぎたら古いものをカット（メモリ対策）
+            if (logText.text.Length > 1000)
+                logText.text = logText.text.Substring(0, 1000);
+        }
+    }
+
+    // --- 選択肢ボタン生成 ---
+    public void CreateChoiceButton(string text, UnityEngine.Events.UnityAction onClickAction)
+    {
+        GameObject btnObj = Instantiate(choiceButtonPrefab, choiceRoot);
+        btnObj.GetComponentInChildren<TextMeshProUGUI>().text = text;
+        btnObj.GetComponent<Button>().onClick.AddListener(onClickAction);
+    }
+
+    // --- ステータス選択ダイアログ ---
+    public void ShowStatusSelection(UnityEngine.Events.UnityAction<string> onSelect, UnityEngine.Events.UnityAction onCancel)
+    {
+        ShowDialogMode("どのステータスを上げますか？");
+
+        CreateChoiceButton("コミュ力", () => onSelect("Commu"));
+        CreateChoiceButton("ギャル力", () => onSelect("Gal"));
+        CreateChoiceButton("レモン力", () => onSelect("Lemon"));
+        CreateChoiceButton("やめる", onCancel);
+    }
+
+    // --- アイテムメニュー表示 ---
+    // stats: 所持データ, onUseCard: カード使用時のコールバック(index), onUseItem: その他アイテム使用時のコールバック(key)
+    public void ShowItemMenu(PlayerStats stats, UnityEngine.Events.UnityAction<int> onUseCard, UnityEngine.Events.UnityAction<string> onUseItem)
+    {
+        if (itemPanel) itemPanel.SetActive(true);
+
+        // リストをリセット
+        foreach (Transform child in itemListRoot) Destroy(child.gameObject);
+
+        // 1. 移動カードの表示 (数字ごとにボタン化)
+        if (stats.moveCards.Count > 0)
+        {
+            for (int i = 0; i < stats.moveCards.Count; i++)
             {
-                GameObject obj = Instantiate(listItemPrefab, listContentRoot);
-                TextMeshProUGUI txt = obj.GetComponentInChildren<TextMeshProUGUI>();
-                txt.text = $"★ {friend.characterName}\n<size=70%>{friend.introduction}</size>";
-                obj.GetComponent<Button>().interactable = false; // 閲覧専用
+                int cardValue = stats.moveCards[i];
+                int listIndex = i; // クロージャキャプチャ用
+
+                GameObject btn = Instantiate(itemButtonPrefab, itemListRoot);
+                btn.GetComponentInChildren<TextMeshProUGUI>().text = $"移動 [{cardValue}]";
+                btn.GetComponent<Button>().onClick.AddListener(() => {
+                    itemPanel.SetActive(false); // 閉じてから実行
+                    onUseCard(listIndex);
+                });
             }
         }
-        CreateCloseButton();
+        else
+        {
+            // カードがない時の表示
+            GameObject btn = Instantiate(itemButtonPrefab, itemListRoot);
+            btn.GetComponentInChildren<TextMeshProUGUI>().text = "移動カードなし";
+            btn.GetComponent<Button>().interactable = false;
+        }
+
+        // 2. その他の所持アイテム表示
+        if (stats.studentIdCount > 0) CreateItemBtn($"生徒手帳 x{stats.studentIdCount}", () => { itemPanel.SetActive(false); onUseItem("StudentId"); });
+        if (stats.present > 0) CreateItemBtn($"プレゼント x{stats.present}", () => { itemPanel.SetActive(false); onUseItem("Present"); });
+        if (stats.eventForce > 0) CreateItemBtn($"イベント強制 x{stats.eventForce}", () => { itemPanel.SetActive(false); onUseItem("EventForce"); });
+
+        // 閉じるボタン
+        CreateItemBtn("閉じる", () => itemPanel.SetActive(false));
     }
 
-    // --- アイテムリスト表示 (修正箇所) ---
-    void RefreshItemList()
+
+
+    void CreateItemBtn(string label, UnityEngine.Events.UnityAction action)
     {
-        ClearList();
-        PlayerStats stats = PlayerStats.Instance;
-
-        // 1. 移動カード (List<ItemData> として処理)
-        foreach (var card in stats.moveCards)
-        {
-            GameObject obj = Instantiate(listItemPrefab, listContentRoot);
-            TextMeshProUGUI txt = obj.GetComponentInChildren<TextMeshProUGUI>();
-            txt.text = card.itemName; // データ名をそのまま表示
-
-            Button btn = obj.GetComponent<Button>();
-            btn.onClick.AddListener(() => {
-                // アイテム使用
-                gameManager.UseItem(card);
-                CloseSubPanels();
-            });
-        }
-
-        // 2. その他のアイテム
-        foreach (var item in stats.otherItems)
-        {
-            GameObject obj = Instantiate(listItemPrefab, listContentRoot);
-            TextMeshProUGUI txt = obj.GetComponentInChildren<TextMeshProUGUI>();
-            txt.text = item.itemName;
-
-            Button btn = obj.GetComponent<Button>();
-            btn.onClick.AddListener(() => {
-                gameManager.UseItem(item);
-                CloseSubPanels();
-            });
-        }
-
-        // 何も持っていない場合
-        if (stats.moveCards.Count == 0 && stats.otherItems.Count == 0)
-        {
-            GameObject emptyObj = Instantiate(listItemPrefab, listContentRoot);
-            emptyObj.GetComponentInChildren<TextMeshProUGUI>().text = "アイテムを持っていません";
-            emptyObj.GetComponent<Button>().interactable = false;
-        }
-
-        CreateCloseButton();
-    }
-
-    // --- ステータス情報表示 ---
-    void UpdateInfoText()
-    {
-        PlayerStats s = PlayerStats.Instance;
-        if (infoText)
-        {
-            infoText.text = $"現在: {s.currentGrade}年生 {s.currentMonth}月\n" +
-                            $"GP: {s.gp:N0}\n友達: {s.friends}人\n\n" +
-                            $"[ステータス]\n" +
-                            $"コミュ: {s.commuLv}  ギャル: {s.galLv}  レモン: {s.lemonLv}\n\n" +
-                            $"移動カード所持: {s.moveCards.Count}/{PlayerStats.MaxMoveCards}";
-        }
-        CreateCloseButton();
-    }
-
-    void CreateCloseButton()
-    {
-        GameObject obj = Instantiate(listItemPrefab, listContentRoot);
-        obj.GetComponentInChildren<TextMeshProUGUI>().text = "閉じる";
-        obj.GetComponent<Button>().onClick.AddListener(CloseSubPanels);
+        GameObject btn = Instantiate(itemButtonPrefab, itemListRoot);
+        btn.GetComponentInChildren<TextMeshProUGUI>().text = label;
+        btn.GetComponent<Button>().onClick.AddListener(action);
     }
 }
