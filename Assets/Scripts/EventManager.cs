@@ -11,77 +11,66 @@ public class EventManager : MonoBehaviour
     public GameObject eventSelectionPanel;
     public TextMeshProUGUI eventTitleText;
 
-    public Button btnOption1;
-    public Button btnOption2;
-    public Button btnOption3;
+    // ★修正: 固定ボタンの変数は不要になったため削除しました
+    // (dynamic generationを使うため)
 
-    public TextMeshProUGUI txtOption1;
-    public TextMeshProUGUI txtOption2;
-    public TextMeshProUGUI txtOption3;
+    [Header("--- Dynamic Buttons ---")]
+    public Transform buttonContainer;      // ボタンを並べる親オブジェクト
+    public GameObject buttonPrefab;        // ボタンのプレハブ
 
     [Header("--- Roulette UI References ---")]
     public GameObject roulettePanel;
     public TextMeshProUGUI rouletteText;
 
-    // 選択肢パネルを表示する
-    // actionsにはボタン1, 2, 3が押されたときの処理（Action）を渡す
+    // 選択肢パネルを表示する（動的生成版）
     public void ShowChoicePanel(string title, string[] labels, UnityAction[] actions)
     {
-        if (eventSelectionPanel) eventSelectionPanel.SetActive(true);
-        if (eventTitleText) eventTitleText.text = title;
+        if (eventSelectionPanel == null) return;
 
-        // ボタン1設定
-        SetupButton(btnOption1, txtOption1, labels, actions, 0);
-        // ボタン2設定
-        SetupButton(btnOption2, txtOption2, labels, actions, 1);
-        // ボタン3設定
-        SetupButton(btnOption3, txtOption3, labels, actions, 2);
-    }
+        eventSelectionPanel.SetActive(true);
+        if (eventTitleText != null) eventTitleText.text = title;
 
-    void SetupButton(Button btn, TextMeshProUGUI txt, string[] labels, UnityAction[] actions, int index)
-    {
-        if (btn == null) return;
-
-        btn.onClick.RemoveAllListeners();
-
-        if (index < labels.Length && !string.IsNullOrEmpty(labels[index]))
+        // 1. 既存のボタンを全て削除（クリア）
+        // これにより、前のイベントのボタンが残るのを防ぎます
+        if (buttonContainer != null)
         {
-            btn.gameObject.SetActive(true);
-            btn.interactable = true; // 初期化
-            if (txt) txt.text = labels[index];
-
-            if (index < actions.Length && actions[index] != null)
+            foreach (Transform child in buttonContainer)
             {
-                btn.onClick.AddListener(() => {
-                    ClosePanel();
-                    actions[index].Invoke();
-                });
-            }
-            else
-            {
-                // アクションがない場合は閉じるだけ
-                btn.onClick.AddListener(ClosePanel);
+                Destroy(child.gameObject);
             }
         }
-        else
+
+        // 2. 新しいボタンを生成
+        for (int i = 0; i < labels.Length; i++)
         {
-            // ラベルがない場合は非表示
-            btn.gameObject.SetActive(false);
+            // アクションの数がラベルより少ない場合のエラー回避
+            if (i >= actions.Length) break;
+
+            if (buttonPrefab != null && buttonContainer != null)
+            {
+                GameObject btnObj = Instantiate(buttonPrefab, buttonContainer);
+                Button btn = btnObj.GetComponent<Button>();
+                TextMeshProUGUI txt = btnObj.GetComponentInChildren<TextMeshProUGUI>();
+
+                if (txt != null) txt.text = labels[i];
+
+                // クリック時の動作登録
+                int index = i; // クロージャ用の一時変数
+                btn.onClick.AddListener(() =>
+                {
+                    actions[index].Invoke();
+                    ClosePanel();
+                });
+            }
         }
     }
 
     public void ClosePanel()
     {
-        if (eventSelectionPanel) eventSelectionPanel.SetActive(false);
+        if (eventSelectionPanel != null) eventSelectionPanel.SetActive(false);
     }
 
-    // 特定のボタンのInteractableを変更する（同伴可否などで使用）
-    public void SetButtonInteractable(int buttonIndex, bool interactable)
-    {
-        if (buttonIndex == 0 && btnOption1) btnOption1.interactable = interactable;
-        if (buttonIndex == 1 && btnOption2) btnOption2.interactable = interactable;
-        if (buttonIndex == 2 && btnOption3) btnOption3.interactable = interactable;
-    }
+    // ★修正: ここにあった余計な '}' を削除し、古い SetupButton メソッドも削除しました
 
     // ルーレット演出
     public IEnumerator PlayRoulette(PlayerStats stats, bool hasBadEventProtection)
@@ -89,6 +78,7 @@ public class EventManager : MonoBehaviour
         if (roulettePanel) roulettePanel.SetActive(true);
         string[] visualResults = { "友達+", "GP+", "GP-", "友達-", "ステUP" };
 
+        // パラパラ演出
         float timer = 0f;
         while (timer < 1.5f)
         {
@@ -148,4 +138,5 @@ public class EventManager : MonoBehaviour
 
         if (roulettePanel) roulettePanel.SetActive(false);
     }
-}
+
+} // ★クラスの閉じ括弧はここ（一番最後）だけにする

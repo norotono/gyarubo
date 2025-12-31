@@ -334,52 +334,103 @@ public class GameManager : MonoBehaviour
     }
 
     // 一人で遊ぶ時の判定（親友 -> ランダム）
+    // 【変更】一人で遊ぶ（ルーレット演出付き）
     void CheckSoloEvent()
     {
-        // 1. 特殊条件親友の出現チェック
+        // 親友確定条件のチェック（ここは確定なので演出なしで即出現でもOKだが、演出に組み込んでも良い）
         FriendData newFriend = CheckSpecialConditionFriend();
+
         if (newFriend != null)
         {
-            RecruitFriend(newFriend); // 確定出現
+            // 条件を満たした親友がいる場合
+            RecruitFriend(newFriend);
             EndTurn();
-            return;
+        }
+        else
+        {
+            // ランダムイベント（ルーレット開始）
+            StartCoroutine(PlayRouletteSequence());
+        }
+    }
+
+    // 【追加】ルーレット演出のコルーチン
+    IEnumerator PlayRouletteSequence()
+    {
+        AddLog("今日は何をしようかな……？");
+        isMoving = true; // 操作ブロック
+
+        // ルーレットの候補テキスト
+        string[] candidates = {
+            "新しい友達ができるかも？",
+            "臨時収入の予感！",
+            "無駄遣いしちゃうかも…",
+            "友達と喧嘩しちゃうかも…",
+            "勉強してステータスUP！"
+        };
+
+        // 演出：テキストをパラパラ切り替える（ログまたは専用パネル）
+        // ※ここでは簡易的にLogを更新する演出とします
+        float duration = 2.0f;
+        float timer = 0f;
+        float interval = 0.1f;
+
+        while (timer < duration)
+        {
+            // ランダムに候補を表示（実際は専用のUI Textを更新するのが望ましいですが、ここではログウィンドウで表現）
+            // もし専用の「結果表示テキスト」があるなら、statusText.text = candidates[...] 等を使用してください
+            int randomIndex = Random.Range(0, candidates.Length);
+            // statusText.text = $"ルーレット中... {candidates[randomIndex]}"; // もし使うなら
+
+            yield return new WaitForSeconds(interval);
+            timer += interval;
+            // 徐々に遅くする演出
+            interval *= 1.1f;
         }
 
-        // 2. 該当者がいなければランダムイベント
-        // (確率: 友+ 30%, GP+ 25%, GP- 25%, 友- 15%, ステ+ 5%)
+        // 結果確定
         int roll = Random.Range(0, 100);
-        if (roll < 30) // 0-29
+        string resultMsg = "";
+
+        if (roll < 30) // 0-29: 友達+
         {
-            AddLog("新しい友達ができた！");
-            AddFriend(currentGrade * 1 + playerStats.commuLv);
+            int val = currentGrade * 1 + playerStats.commuLv;
+            AddFriend(val);
+            resultMsg = "新しい友達ができた！";
         }
-        else if (roll < 55) // 30-54
+        else if (roll < 55) // 30-54: GP+
         {
             int gain = currentGrade * 150 + playerStats.galLv * 100;
             AddGP(gain);
-            AddLog($"臨時収入！ GP+{gain}");
+            resultMsg = $"臨時収入！ GP+{gain}";
         }
-        else if (roll < 80) // 55-79
+        else if (roll < 80) // 55-79: GP-
         {
-            // ノア・サオリの能力判定はここでも有効にするなら記述
             int loss = currentGrade * 100;
             if (HasFriendEffect(FriendEffectType.NullifyGPMinus)) loss = 0;
             playerStats.gp = Mathf.Max(0, playerStats.gp - loss);
-            AddLog($"無駄遣いしてしまった…… GP-{loss}");
+            resultMsg = $"無駄遣いしてしまった…… GP-{loss}";
         }
-        else if (roll < 95) // 80-94
+        else if (roll < 95) // 80-94: 友達-
         {
-            AddLog("友達と喧嘩してしまった…… 友達-1");
             if (playerStats.friends > 0) playerStats.friends--;
+            resultMsg = "友達と喧嘩してしまった…… 友達-1";
         }
-        else // 95-99
+        else // 95-99: ステータスUP
         {
-            AddLog("勉強がはかどった！ コミュ力UP (仮)");
-            // どのステータスを上げるかはランダム等の処理
+            // ランダムにステータスアップ
+            int type = Random.Range(0, 3);
+            if (type == 0) { playerStats.commuLv++; resultMsg = "勉強してコミュ力が上がった！"; }
+            else if (type == 1) { playerStats.galLv++; resultMsg = "メイクの研究をしてギャル力が上がった！"; }
+            else { playerStats.lemonLv++; resultMsg = "恋バナをしてレモン力が上がった！"; }
         }
 
+        AddLog($"結果: {resultMsg}");
+
+        yield return new WaitForSeconds(1.0f);
+        isMoving = false;
         EndTurn();
     }
+
     void HandleMaleTile()
     {
         string[] labels = { "情報 (ヒント)", "友達になる", "会話 (GP+300)" };
