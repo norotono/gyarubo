@@ -28,21 +28,13 @@ public class BoyfriendManager : MonoBehaviour
     public PlayerStats playerStats;
     private string[] nameDatabase = { "タクヤ", "カズマ", "ショウ", "レン", "ユウキ", "ハルト", "リク", "ソラ", "コウセイ", "ヤマト" };
 
-    // ★追加: 安全性チェック用プロパティ
-    // リストがnullなら自動生成し、アクセス可能にする
+    // 安全リスト取得
     private List<MaleFriendData> SafeMaleList
     {
         get
         {
-            if (playerStats == null)
-            {
-                Debug.LogError("【Error】BoyfriendManager: PlayerStats がアタッチされていません！");
-                return new List<MaleFriendData>(); // 空リストを返してエラー回避
-            }
-            if (playerStats.maleFriendsList == null)
-            {
-                playerStats.maleFriendsList = new List<MaleFriendData>();
-            }
+            if (playerStats == null) return new List<MaleFriendData>();
+            if (playerStats.maleFriendsList == null) playerStats.maleFriendsList = new List<MaleFriendData>();
             return playerStats.maleFriendsList;
         }
     }
@@ -50,78 +42,76 @@ public class BoyfriendManager : MonoBehaviour
     // 男友達追加
     public void AddNewMaleFriend()
     {
-        // SafeMaleListを使うことでnullチェック不要
         string baseName = nameDatabase[Random.Range(0, nameDatabase.Length)];
-        string newName = $"{baseName}{SafeMaleList.Count + 1}"; // 番号をつけて重複感軽減
+        string newName = $"{baseName}{SafeMaleList.Count + 1}";
 
         MaleFriendData newGuy = new MaleFriendData(newName);
         SafeMaleList.Add(newGuy);
         Debug.Log($"男友達追加: {newName}");
     }
 
-    // 親密度アップ & 彼氏昇格判定
-    public string IncreaseAffection(float baseValue)
+    // 【修正】親密度アップ
+    // targetIndex: -1 なら「全員（制限なし）」、0以上なら「そのインデックスの彼のみ」
+    public string IncreaseAffection(float amount, int targetIndex = -1)
     {
-        // リストが空なら処理しない
         if (SafeMaleList.Count == 0) return "相手がいません";
 
-        // ★修正: リスト内の null を除外して検索
-        var target = SafeMaleList
-            .Where(m => m != null && !m.isBoyfriend)
-            .OrderByDescending(m => m.currentAffection)
-            .FirstOrDefault();
+        string resultMsg = "";
 
-        // 候補がいない（全員彼氏、または全員null）場合
-        if (target == null)
+        // ★ -1 (デフォルト) の場合は全員に加算
+        if (targetIndex == -1)
         {
-            // 彼氏がいるなら最初の彼氏とデート
-            target = SafeMaleList.FirstOrDefault(m => m != null && m.isBoyfriend);
+            int count = 0;
+            foreach (var guy in SafeMaleList)
+            {
+                if (guy == null) continue;
 
-            // それでもいなければ（全部nullなど）
-            if (target == null) return "デート相手が見つかりませんでした。";
+                guy.currentAffection += amount;
+                CheckPromotion(guy);
+                count++;
+            }
+            resultMsg = $"全員({count}名)の親密度が +{amount} されました！";
         }
-
-        // 人数による上昇量減衰
-        int maleCount = SafeMaleList.Count(m => m != null && !m.isBoyfriend);
-        float multiplier = 1.0f + (maleCount * 0.5f);
-        float finalGain = baseValue / multiplier;
-
-        target.currentAffection += finalGain;
-        string resultMsg = $"{target.name} 親密度+{finalGain:F1} (現在:{target.currentAffection:F1}%)";
-
-        // 100%超えで彼氏昇格
-        if (!target.isBoyfriend && target.currentAffection >= 100f)
+        else
         {
-            PromoteToBoyfriend(target);
-            resultMsg += $"\n【祝】{target.name} から告白されました！ 彼氏になった！";
+            // 特定の相手（デートイベントなど）
+            if (targetIndex >= 0 && targetIndex < SafeMaleList.Count)
+            {
+                var guy = SafeMaleList[targetIndex];
+                if (guy != null)
+                {
+                    guy.currentAffection += amount;
+                    CheckPromotion(guy);
+                    resultMsg = $"{guy.name} の親密度 +{amount} (現在:{guy.currentAffection}%)";
+                }
+            }
         }
 
         return resultMsg;
     }
 
-    void PromoteToBoyfriend(MaleFriendData guy)
+    // 昇格チェック
+    void CheckPromotion(MaleFriendData guy)
     {
-        if (guy == null) return; // 安全策
-
-        guy.isBoyfriend = true;
-        // 能力ランダム決定
-        guy.effectType = (Random.Range(0, 2) == 0) ? BoyfriendType.TypeA_Gp : BoyfriendType.TypeB_Friend;
-
-        if (playerStats != null) playerStats.boyfriendCount++;
+        if (!guy.isBoyfriend && guy.currentAffection >= 100f)
+        {
+            guy.isBoyfriend = true;
+            guy.effectType = (Random.Range(0, 2) == 0) ? BoyfriendType.TypeA_Gp : BoyfriendType.TypeB_Friend;
+            if (playerStats != null) playerStats.boyfriendCount++;
+            Debug.Log($"【祝】{guy.name} が彼氏になりました！");
+        }
     }
 
-    // 毎ターンの効果発動
+    // 毎ターンの効果
     public string ActivateBoyfriendEffects()
     {
         int totalGp = 0;
         int totalFriend = 0;
         int count = 0;
 
-        // ★修正: foreachで回す際も null チェックを入れる
         foreach (var guy in SafeMaleList)
         {
-            if (guy == null) continue; // null要素はスキップ
-
+            if (guy == null) continue;
             if (guy.isBoyfriend)
             {
                 count++;
@@ -138,6 +128,6 @@ public class BoyfriendManager : MonoBehaviour
             playerStats.friends += totalFriend;
         }
 
-        return $"彼氏({count}人)からのプレゼント: GP+{totalGp}, 友+{totalFriend}";
+        return $"彼氏({count}人)効果: GP+{totalGp}, 友+{totalFriend}";
     }
 }

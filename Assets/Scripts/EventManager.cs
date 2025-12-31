@@ -146,4 +146,27 @@ public class EventManager : MonoBehaviour
         // 完了通知
         onComplete?.Invoke();
     }
+    public void ShowOptions(string title, string description, string btn1Txt, string btn2Txt, string btn3Txt, UnityAction act1, UnityAction act2, UnityAction act3)
+    {
+        // 説明文(description)を表示する場所がない場合、タイトルに改行して結合して表示します
+        string finalTitle = title;
+        if (!string.IsNullOrEmpty(description))
+        {
+            finalTitle += "\n<size=80%>" + description + "</size>";
+        }
+
+        // リストを作成して既存の ShowChoicePanel に渡す
+        List<string> labelList = new List<string>();
+        List<UnityAction> actionList = new List<UnityAction>();
+
+        // ボタン1
+        if (!string.IsNullOrEmpty(btn1Txt)) { labelList.Add(btn1Txt); actionList.Add(act1); }
+        // ボタン2
+        if (!string.IsNullOrEmpty(btn2Txt)) { labelList.Add(btn2Txt); actionList.Add(act2); }
+        // ボタン3
+        if (!string.IsNullOrEmpty(btn3Txt)) { labelList.Add(btn3Txt); actionList.Add(act3); }
+
+        // 既存のメソッドを呼び出す
+        ShowChoicePanel(finalTitle, labelList.ToArray(), actionList.ToArray());
+    }
 }

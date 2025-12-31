@@ -38,6 +38,7 @@ public class GameManager : MonoBehaviour
     // 内部変数
     private int currentTileIndex = 0;
     private bool isMoving = false;
+    private bool hasRerolledThisTurn = false;
     // 親友効果を持っているかチェック
 
     private int middleTileIndex = 24;
@@ -48,6 +49,7 @@ public class GameManager : MonoBehaviour
 
         // 1. 友達データの初期化
         InitializeFriends();
+        hasRerolledThisTurn = false; // ★この行を追加
         // ★追加: 最初はダイス画像を消しておく
         if (diceImage != null) diceImage.gameObject.SetActive(false);
 
@@ -82,34 +84,57 @@ public class GameManager : MonoBehaviour
 
     IEnumerator RollDiceSequence()
     {
-        isMoving = true;
-        diceButton.interactable = false;
-        // ★追加: 回す時だけ表示
-        if (diceImage != null) diceImage.gameObject.SetActive(true);
+        // ... (サイコロアニメーション開始などはそのまま) ...
 
-        float timer = 0f;
-        while (timer < 0.5f)
-        {
-            if (diceImage && diceSprites.Length > 0)
-                diceImage.sprite = diceSprites[Random.Range(0, 6)];
-            yield return new WaitForSeconds(0.05f);
-            timer += 0.05f;
-        }
+        // 1回目のロール
+        int diceResult = Random.Range(1, 7);
+        // サイコロの目画像の更新処理があればここに記述
+        // UpdateDiceUI(diceResult); 
 
-        int result = Random.Range(1, 7);
-        if (diceImage && diceSprites.Length >= 6)
-            diceImage.sprite = diceSprites[result - 1];
-
-        // ★追加: 1の目カウント (親友条件: DiceOne用)
-        if (result == 1) playerStats.diceOneCount++;
-
-        // ダイスボーナス
-        if (result == 5) { playerStats.gp += 100; AddLog("ボーナス: GP+100"); }
-        if (result == 6) { playerStats.friends += 1; AddLog("ボーナス: 友達+1"); }
-        UpdateMainUI();
+        Debug.Log($"ダイス結果: {diceResult}");
 
         yield return new WaitForSeconds(0.5f);
-        yield return StartCoroutine(MovePlayer(result));
+
+        // ★追加: カオル(DiceReroll)の効果チェック
+        // カオルが仲間で、まだリロールしておらず、かつダイスUIが表示されている場合
+        if (HasFriendEffect(FriendEffectType.DiceReroll) && !hasRerolledThisTurn)
+        {
+            bool deciding = true;
+            bool doReroll = false;
+
+            // 選択肢を表示
+            eventManager.ShowOptions(
+                "カオルの能力",
+                $"今の出目は【{diceResult}】だよ。\n振り直す？",
+                "振り直す！",
+                "このまま進む",
+                null, // 3つ目はなし
+                () => { doReroll = true; deciding = false; },   // Yes
+                () => { doReroll = false; deciding = false; },  // No
+                null
+            );
+
+            // プレイヤーの選択を待つ
+            yield return new WaitUntil(() => !deciding);
+
+            if (doReroll)
+            {
+                hasRerolledThisTurn = true;
+                Debug.Log("カオルの能力で振り直します！");
+
+                // もう一度ロール演出などを入れても良いですが、ここでは即座に値を更新
+                diceResult = Random.Range(1, 7);
+                Debug.Log($"再ロール結果: {diceResult}");
+
+                // 結果表示の更新（必要なら）
+                // UpdateDiceUI(diceResult);
+
+                yield return new WaitForSeconds(0.5f);
+            }
+        }
+
+        // ここから移動処理（既存のコードへ）
+        yield return StartCoroutine(MovePlayer(diceResult));
     }
 
     IEnumerator MovePlayer(int steps)
@@ -496,14 +521,50 @@ public class GameManager : MonoBehaviour
 
     void HandleMiddleTile()
     {
-        string[] labels = { "GP +800", "親密度 +40", "モブ昇格" };
-        UnityAction[] actions = new UnityAction[3];
+        Debug.Log("中間地点に到達！ ボーナスを選択してください。");
 
-        actions[0] = () => { AddGP(800); EndTurn(); };
-        actions[1] = () => { playerStats.present += 40; EndTurn(); }; // 仮
-        actions[2] = () => { EndTurn(); };
+        // UIパネルを表示
+        eventManager.ShowOptions(
+            "中間地点ボーナス",
+            "ここまでのご褒美！ 好きなものを選んでね。",
 
-        eventManager.ShowChoicePanel("中間地点", labels, actions);
+            // 選択肢1: GPゲット
+            "GP +1000",
+
+            // 選択肢2: 親密度アップ（全員）
+            "男子全員の親密度 +40",
+
+            // 選択肢3: 友達ゲット（モブ昇格廃止 -> 友達+10）
+            "友達 +10人",
+
+            // Action 1
+            () =>
+            {
+                playerStats.gp += 1000;
+                Debug.Log("GP +1000");
+                EndTurn();
+            },
+
+            // Action 2
+            () =>
+            {
+                if (boyfriendManager != null)
+                {
+                    // -1指定で全員に +40
+                    string msg = boyfriendManager.IncreaseAffection(40f, -1);
+                    Debug.Log(msg);
+                }
+                EndTurn();
+            },
+
+            // Action 3
+            () =>
+            {
+                playerStats.friends += 10;
+                Debug.Log("友達 +10人");
+                EndTurn();
+            }
+        );
     }
 
     // 【修正】古い呼び出し方になっていた部分を修正
