@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-
+using System.Linq; // List操作用
 public class GameManager : MonoBehaviour
 {
     [Header("--- Managers ---")]
@@ -41,46 +41,166 @@ public class GameManager : MonoBehaviour
         if (diceButton) diceButton.onClick.AddListener(OnDiceClicked);
     }
 
-    IEnumerator InitPosition()
+    void AssignFriendConditions()
+    {
+        // 条件リスト定義
+        List<ScoutConditionType> conditions = new List<ScoutConditionType>
+        {
+            ScoutConditionType.MaleContact,
+            ScoutConditionType.HighGP_Tile,
+            ScoutConditionType.LowGP_Tile,
+            ScoutConditionType.DiceOne,
+            ScoutConditionType.RichGP,
+            ScoutConditionType.HighSpend,
+            ScoutConditionType.HighFriends,
+            ScoutConditionType.HighSteps,
+            ScoutConditionType.Solitude,
+            ScoutConditionType.HighStatus
+        };
+
+        // シャッフル
+        conditions = conditions.OrderBy(x => Random.value).ToList();
+
+        // アイ以外の友達を抽出
+        var randomFriends = allFriends.Where(f => f.effectType != FriendEffectType.ScoreDoubler).ToList();
+        randomFriends = randomFriends.OrderBy(x => Random.value).ToList();
+
+        // 割り当て (5人が教室、4人が特殊条件)
+        for (int i = 0; i < randomFriends.Count; i++)
+        {
+            FriendData f = randomFriends[i];
+            f.isRecruited = false; // リセット
+
+            if (i < 5)
+            {
+                // A: 教室タイプ
+                f.assignedCondition = ScoutConditionType.Classroom;
+                // ※本来は各階の教室マスにこのキャラを紐付ける処理が必要
+            }
+            else
+            {
+                // B: 特殊条件タイプ
+                f.assignedCondition = conditions[i - 5];
+
+                // 閾値の設定 (ハードコードまたは別途データ化)
+                switch (f.assignedCondition)
+                {
+                    case ScoutConditionType.MaleContact: f.conditionThreshold = 4; break;
+                    case ScoutConditionType.HighGP_Tile: f.conditionThreshold = 5; break;
+                    case ScoutConditionType.LowGP_Tile: f.conditionThreshold = 3; break;
+                    case ScoutConditionType.DiceOne: f.conditionThreshold = 3; break;
+                    case ScoutConditionType.RichGP: f.conditionThreshold = 3000; break;
+                    case ScoutConditionType.HighSpend: f.conditionThreshold = 4000; break;
+                    case ScoutConditionType.HighFriends: f.conditionThreshold = 20; break;
+                    case ScoutConditionType.HighSteps: f.conditionThreshold = 80; break;
+                    case ScoutConditionType.Solitude: f.conditionThreshold = 3; break;
+                    case ScoutConditionType.HighStatus: f.conditionThreshold = 2; break;
+                }
+            }
+        }
+
+        // アイの設定 (固定)
+        var ai = allFriends.FirstOrDefault(f => f.effectType == FriendEffectType.ScoreDoubler);
+        if (ai != null)
+        {
+            ai.isRecruited = false;
+            ai.assignedCondition = ScoutConditionType.Fixed_Ai;
+        }
+    }
+
+    // スカウト判定
+    public FriendData CheckScoutableFriend()
+    {
+        PlayerStats s = PlayerStats.Instance;
+
+        foreach (var f in allFriends)
+        {
+            if (f.isRecruited) continue;
+            if (f.assignedCondition == ScoutConditionType.Classroom) continue; // 教室タイプはイベントマスでは出ない
+
+            bool met = false;
+            switch (f.assignedCondition)
+            {
+                case ScoutConditionType.Fixed_Ai:
+                    if (s.maleContactCount >= 8 || s.gp >= 5000) met = true;
+                    break;
+                case ScoutConditionType.MaleContact:
+                    if (s.maleContactCount >= f.conditionThreshold) met = true;
+                    break;
+                case ScoutConditionType.HighGP_Tile:
+                    if (s.gpPlusTileCount >= f.conditionThreshold) met = true;
+                    break;
+                // ... 他の条件も同様に記述 ...
+                case ScoutConditionType.HighStatus:
+                    if (s.commuLv >= 2 && s.galLv >= 2 && s.lemonLv >= 2) met = true;
+                    break;
+            }
+
+            if (met) return f;
+        }
+        return null;
+    }
+}
+IEnumerator InitPosition()
     {
         yield return null;
         if (boardManager) boardManager.MovePlayerPiece(0);
     }
 
     // --- アイテム使用ロジック (修正版) ---
+    // GameManager.cs の UseItem メソッドのみ抜粋・修正
+    // 既存の UseItem メソッドをこれで上書きしてください
+
     public void UseItem(ItemData item)
     {
-        if (isMoving)
-        {
-            AddLog("移動中はアイテムを使えません。");
-            return;
-        }
+        // 移動中の使用禁止
+        if (isMoving) { AddLog("移動中は使えません。"); return; }
 
         AddLog($"アイテム使用: {item.itemName}");
 
-        // PlayerStats側で削除処理を行う
-        stats.RemoveItem(item);
+        // インベントリから削除（PlayerStats側で処理）
+        PlayerStats.Instance.RemoveItem(item);
 
         switch (item.itemType)
         {
             case ItemType.MoveCard:
-                // moveStepsを使用して移動
                 StartCoroutine(TurnSequence(item.moveSteps));
                 break;
 
             case ItemType.Recovery:
-                // effectValueを使用して回復
-                stats.gp += item.effectValue;
-                AddLog($"GPが {item.effectValue} 回復しました。");
+                PlayerStats.Instance.gp += item.effectValue;
+                AddLog($"GPが {item.effectValue} 回復しました！");
                 UpdateMainUI();
                 break;
 
-            case ItemType.EventForce:
-                AddLog("不思議な力が働いた！（未実装）");
+            case ItemType.StatusUp:
+                switch (item.targetStatus)
+                {
+                    case TargetStatus.Commu:
+                        PlayerStats.Instance.commuLv += item.effectValue;
+                        AddLog($"コミュ力が {item.effectValue} 上がった！");
+                        break;
+                    case TargetStatus.Gal:
+                        PlayerStats.Instance.galLv += item.effectValue;
+                        AddLog($"ギャル力が {item.effectValue} 上がった！");
+                        break;
+                    case TargetStatus.Lemon:
+                        PlayerStats.Instance.lemonLv += item.effectValue;
+                        AddLog($"レモン力が {item.effectValue} 上がった！");
+                        break;
+                }
+                UpdateMainUI();
+                break;
+
+            case ItemType.Special:
+                // 卒業証書: モブ親友昇格（仕様書：友達1人をモブ親友(30点相当)にする）
+                // 簡易実装として、友達数を減らさずにスコア用の隠しパラメータを加算、または単に友達+30する
+                PlayerStats.Instance.friends += item.effectValue;
+                AddLog($"卒業証書を使いました！ 友達評価が大幅アップ (+{item.effectValue})");
+                UpdateMainUI();
                 break;
         }
     }
-
     // --- ゲーム進行 ---
     void OnDiceClicked()
     {

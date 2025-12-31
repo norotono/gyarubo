@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 814facc86231ff44cb5697efe50703df, type: 3}
-  m_Name: NewItem
+  m_Name: Item_Cosme
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
   itemName: 
   description: 
@@ -19,3 +19,4 @@ MonoBehaviour:
   itemType: 0
   moveSteps: 0
   effectValue: 0
+  targetStatus: 0

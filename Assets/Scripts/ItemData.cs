@@ -1,26 +1,22 @@
 using UnityEngine;
 
-public enum ItemType
-{
-    MoveCard,       // 移動カード
-    Recovery,       // 回復アイテム
-    EventForce      // イベント強制アイテム
+public enum ItemType {
+    MoveCard_Random, MoveCard_HighLow, ClassroomAccess, Recovery,
+    ForceEvent, StatusUp, FriendBoost, DynamicPrice
 }
+public enum TargetStatus { None, Commu, Gal, Lemon }
 
 [CreateAssetMenu(fileName = "NewItem", menuName = "Gyarubo/ItemData")]
-public class ItemData : ScriptableObject
-{
+public class ItemData : ScriptableObject {
     public string itemName;
     [TextArea] public string description;
     public Sprite icon;
-
-    public int basePrice; // 基本価格
-
+    public int basePrice;
     public ItemType itemType;
-
-    [Header("Item Effects")]
-    [Range(0, 6)]
-    public int moveSteps; // 移動カード用 (1~6)
-
-    public int effectValue; // 回復アイテムなどの効果量
+    public int effectValue;
+    public int priceIncrement;
+    public TargetStatus targetStatus;
+    
+    [Header("Move Card")]
+    [Range(0, 6)] public int moveSteps; // 旧仕様互換用
 }
