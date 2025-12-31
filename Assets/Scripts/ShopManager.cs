@@ -31,7 +31,17 @@ public class ShopManager : MonoBehaviour
         shopItems.Clear();
         shopItems.Add(new ShopItem("生徒手帳", 200, "教室用", () => stats.studentIdCount++));
         shopItems.Add(new ShopItem("移動カード", 150, "ランダム", () => stats.moveCards.Add(Random.Range(1, 7))));
-        shopItems.Add(new ShopItem("プレゼント", 500, "親密度UP", () => stats.present++));
+        shopItems.Add(new ShopItem("プレゼント", 500, "親密度UP", () => {
+            // GameManagerなどを経由してBoyfriendManagerを呼ぶのが理想ですが、
+            // 簡易的に直接ロジックを書くか、Manager参照を持たせます。
+            // ここでは一番簡単な「GameManager経由」を想定
+            var bfMgr = FindObjectOfType<BoyfriendManager>();
+            if (bfMgr)
+            {
+                string log = bfMgr.IncreaseAffection(30f); // プレゼントは固定+30とする
+                Debug.Log(log);
+            }
+        }));
         shopItems.Add(new ShopItem("イベント強制", 800, "マス無視", () => stats.eventForce++));
         shopItems.Add(new ShopItem("ステータスUP", 1500, "Lv+1", () => stats.commuLv++));
 

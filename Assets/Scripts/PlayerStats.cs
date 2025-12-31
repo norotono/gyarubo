@@ -29,6 +29,8 @@ public class PlayerStats : MonoBehaviour
     public int lemonLv = 0;
 
     // --- ”ŞE’j—F’B ---
+    [Header("--- Friends & Love ---")]
+    public List<MaleFriendData> maleFriendsList = new List<MaleFriendData>(); // š’Ç‰Á
     public int boyfriendCount = 0;
     public int maleFriendCount = 0;
     public int boyfriendAbilityType = 0;

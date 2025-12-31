@@ -12,6 +12,7 @@ public class GameManager : MonoBehaviour
     public BoardManager boardManager;
     public ShopManager shopManager;
     public EventManager eventManager;
+    public BoyfriendManager boyfriendManager; // ★Inspectorでアタッチする！
 
     [Header("--- Game Settings ---")]
     [Range(1, 3)]
@@ -296,11 +297,25 @@ public class GameManager : MonoBehaviour
     void HandleMaleTile()
     {
         string[] labels = { "情報", "友達になる", "会話 (GP+300)" };
-        UnityAction[] actions = new UnityAction[3];
+        UnityEngine.Events.UnityAction[] actions = new UnityEngine.Events.UnityAction[3];
 
+        // 1. 情報 (実装済みと仮定)
         actions[0] = () => { /* 情報処理 */ EndTurn(); };
-        actions[1] = () => { playerStats.maleFriendCount++; EndTurn(); };
-        actions[2] = () => { AddGP(300); EndTurn(); };
+
+        // 2. 友達になる (修正箇所)
+        actions[1] = () => {
+            boyfriendManager.AddNewMaleFriend(); // ★呼び出し
+            AddLog("新しい男友達ができました！");
+            playerStats.maleContactCount++; // 接触カウントは共通
+            EndTurn();
+        };
+
+        // 3. 会話
+        actions[2] = () => {
+            AddGP(300);
+            playerStats.maleContactCount++;
+            EndTurn();
+        };
 
         eventManager.ShowChoicePanel("男子生徒", labels, actions);
     }
