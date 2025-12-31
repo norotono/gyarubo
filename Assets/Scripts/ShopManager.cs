@@ -105,7 +105,10 @@ public class ShopManager : MonoBehaviour
                 if (stats.gp >= finalPrice)
                 {
                     stats.gp -= finalPrice;
+
+                    // š’Ç‰Á: w”ƒ‚Å‚ÌÁ”ï‘Šz‚ğ‰ÁZ (e—FğŒ: Wasteful—p)
                     stats.shopSpentTotal += finalPrice;
+
                     item.onBuy.Invoke();
                     Debug.Log($"w“ü: {item.itemName}");
 

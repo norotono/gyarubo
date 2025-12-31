@@ -92,8 +92,10 @@ public class GameManager : MonoBehaviour
         int result = Random.Range(1, 7);
         if (diceImage && diceSprites.Length >= 6)
             diceImage.sprite = diceSprites[result - 1];
+
         // ★追加: 1の目カウント (親友条件: DiceOne用)
         if (result == 1) playerStats.diceOneCount++;
+
         // ダイスボーナス
         if (result == 5) { playerStats.gp += 100; AddLog("ボーナス: GP+100"); }
         if (result == 6) { playerStats.friends += 1; AddLog("ボーナス: 友達+1"); }
@@ -107,6 +109,7 @@ public class GameManager : MonoBehaviour
     {
         // ★追加: 歩数カウントを加算 (親友条件: Steps用)
         playerStats.totalSteps += steps;
+
         for (int i = 0; i < steps; i++)
         {
             currentTileIndex++;
@@ -121,7 +124,7 @@ public class GameManager : MonoBehaviour
                     AddLog($"進級！ {currentGrade}年生になりました。");
 
                     boardManager.InitializeBoard(currentGrade);
-                    shopManager.InitializeShopItems(currentGrade, playerStats); // 商品更新
+                    shopManager.InitializeShopItems(currentGrade, playerStats);
                     yield return null;
 
                     boardManager.MovePlayerPiece(0);
@@ -134,7 +137,6 @@ public class GameManager : MonoBehaviour
                     currentTileIndex = boardManager.totalTiles - 1;
                     boardManager.MovePlayerPiece(currentTileIndex);
                     AddLog("ゲーム終了！");
-                    // ここにリザルト処理を入れる予定
                     break;
                 }
             }
@@ -143,11 +145,16 @@ public class GameManager : MonoBehaviour
             UpdateMainUI();
 
             // 通過時の購買チェック
+            // 通過時の購買チェック
             if (boardManager.BoardLayout[currentTileIndex] == "Shop" && i < steps - 1)
             {
                 AddLog("購買部を通過します。");
-                yield return StartCoroutine(shopManager.OpenShopSequence(playerStats, false));
-                UpdateMainUI(); // 買い物後の更新
+
+                // ★修正: エミ（ShopDiscount）がいれば通過時でも割引ONにする
+                bool hasDiscount = HasFriendEffect(FriendEffectType.ShopDiscount);
+
+                yield return StartCoroutine(shopManager.OpenShopSequence(playerStats, hasDiscount));
+                UpdateMainUI();
             }
 
             // 中間地点チェック
@@ -169,7 +176,7 @@ public class GameManager : MonoBehaviour
     {
         string type = boardManager.BoardLayout[tileIndex];
 
-        // 親友効果のチェック
+        // 親友効果のチェック: ユナ（マス効果2倍）
         int mult = 1;
         if (type != "Middle" && type != "Shop" && HasFriendEffect(FriendEffectType.DoubleTileEffect)) mult = 2;
 
@@ -177,7 +184,7 @@ public class GameManager : MonoBehaviour
         {
             case "Event":
                 HandleEventTile();
-                return; // EndTurnはイベント後に呼ぶ
+                return;
 
             case "Male":
                 HandleMaleTile();
@@ -189,19 +196,35 @@ public class GameManager : MonoBehaviour
 
             case "Shop":
                 Debug.Log("【購買部】ピッタリ停止！ 20% OFF!");
-                // 購買コルーチン開始
                 StartCoroutine(RunShopTileSequence());
                 return;
 
             case "GPPlus":
                 int gVal = (currentGrade * 150 + playerStats.galLv * 100) * mult;
-                AddGP(gVal);
+                // ★追加: ミレイの能力 (GP獲得1.5倍)
+                if (HasFriendEffect(FriendEffectType.GPMultiplier)) gVal = (int)(gVal * 1.5f);
+
+                playerStats.gp += gVal;
                 playerStats.gpIncreaseTileCount++;
                 break;
 
             case "GPMinus":
-                if (HasFriendEffect(FriendEffectType.NullifyGPMinus)) break;
-                if (HasFriendEffect(FriendEffectType.BadEventToGP)) { AddGP(100 * mult); break; }
+                // ★追加: ノアの能力 (減少→増加変換)
+                if (HasFriendEffect(FriendEffectType.BadEventToGP))
+                {
+                    int bonus = 100 * mult;
+                    if (HasFriendEffect(FriendEffectType.GPMultiplier)) bonus = (int)(bonus * 1.5f);
+                    playerStats.gp += bonus;
+                    AddLog("ノアの能力: GP減少を回避して逆に獲得！");
+                    break;
+                }
+                // ★追加: サオリの能力 (減少無効化)
+                if (HasFriendEffect(FriendEffectType.NullifyGPMinus))
+                {
+                    AddLog("サオリの能力: GP減少を無効化した。");
+                    break;
+                }
+
                 int gLoss = (currentGrade * 100) * mult;
                 playerStats.gp = Mathf.Max(0, playerStats.gp - gLoss);
                 playerStats.gpDecreaseTileCount++;
@@ -213,7 +236,16 @@ public class GameManager : MonoBehaviour
                 break;
 
             case "FriendMinus":
-                if (HasFriendEffect(FriendEffectType.BadEventToGP)) { AddGP(100 * mult); break; }
+                // ★追加: ノアの能力 (減少→増加変換)
+                if (HasFriendEffect(FriendEffectType.BadEventToGP))
+                {
+                    int bonus = 100 * mult;
+                    if (HasFriendEffect(FriendEffectType.GPMultiplier)) bonus = (int)(bonus * 1.5f);
+                    playerStats.gp += bonus;
+                    AddLog("ノアの能力: 友達減少を回避してGPを獲得！");
+                    break;
+                }
+
                 int fLoss = 1 * mult;
                 if (playerStats.friends > 0) playerStats.friends -= fLoss;
                 break;
@@ -221,6 +253,7 @@ public class GameManager : MonoBehaviour
 
         EndTurn();
     }
+
 
     // --- イベントハンドリング ---
 
@@ -297,16 +330,20 @@ public class GameManager : MonoBehaviour
     {
         int shinyu = allFriends.Count(f => f.isRecruited);
         playerStats.gp += playerStats.CalculateSalary(shinyu);
+
+        // レナの能力: 毎ターン友達+1
+        if (HasFriendEffect(FriendEffectType.AutoFriend)) AddFriend(1);
+
         // ★追加: リカの能力 (12ターンごとにカード生成)
         if (HasFriendEffect(FriendEffectType.CardGeneration) && playerStats.currentTurn % 12 == 0)
         {
-            // インベントリ上限チェックが必要ならここに記述
             if (playerStats.moveCards.Count < 5)
             {
-                playerStats.moveCards.Add(Random.Range(1, 7)); // 1-6のランダムカード
+                playerStats.moveCards.Add(Random.Range(1, 7));
                 AddLog("リカの能力: 定期便で移動カードが届きました！");
             }
         }
+
         playerStats.currentTurn++;
         playerStats.currentMonth++;
         if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
