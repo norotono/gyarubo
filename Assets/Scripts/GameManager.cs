@@ -312,7 +312,44 @@ public class GameManager : MonoBehaviour
         yield return StartCoroutine(shopManager.OpenShopSequence(playerStats, discount));
         EndTurn();
     }
+    // GameManager.cs クラス内に以下のメソッドを追加してください
 
+
+
+    // ★追加: 教室での親友チャレンジ処理
+    void HandleClassroomChallenge(int tileIndex)
+    {
+        Debug.Log($"教室(Tile:{tileIndex})で親友を探します。");
+
+        // 1. この教室に割り当てられている親友を探す
+        // (assignedRoom の判定は文字列比較など実装に合わせて調整してください。ここでは簡易的に探します)
+
+        // とりあえずランダムな確率で発見する処理（仮実装）
+        // ※本来は tileIndex に対応する部屋名 ("2-A"など) と f.assignedRoom を比較します
+        bool isSuccess = (Random.value < 0.5f); // 50%で発見
+
+        if (isSuccess)
+        {
+            // まだ仲間にしていない、かつ教室条件の親友をランダムに1人選ぶ
+            var target = allFriends.FirstOrDefault(f =>
+                !f.isRecruited && f.assignedCondition == ConditionType.Classroom);
+
+            if (target != null)
+            {
+                target.isRecruited = true;
+                target.isHintRevealed = true;
+                eventManager.ShowMessage($"【成功】\n教室で {target.friendName} を見つけました！\n仲間に誘いました。", EndTurn);
+            }
+            else
+            {
+                eventManager.ShowMessage("教室に誰かいる気配がしましたが、\n既に全員仲間のようです。", EndTurn);
+            }
+        }
+        else
+        {
+            eventManager.ShowMessage("教室には誰もいないようです……。", EndTurn);
+        }
+    }
 
     // 【修正】教室マスの処理（選択肢を2つに限定）
     void HandleClassroomTile(int index)

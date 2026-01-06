@@ -45,6 +45,8 @@ public class PlayerStats : MonoBehaviour
     public int albumPrice = 1000;
 
     // --- 各種カウンタ（親友出現条件用） ---
+    // ★追加: 幸福度パラメータ（親友出現条件で使用）
+    public int happiness = 0;
     public int maleContactCount = 0;
     public int gpIncreaseTileCount = 0;
     public int gpDecreaseTileCount = 0;

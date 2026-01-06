@@ -15,6 +15,7 @@ public class BoardManager : MonoBehaviour
     public string[] BoardLayout { get; private set; }
 
     // 初期化処理
+    // 初期化処理
     public void InitializeBoard(int currentGrade)
     {
         // 既存のマスの削除
@@ -23,10 +24,21 @@ public class BoardManager : MonoBehaviour
         BoardLayout = new string[totalTiles];
 
         // 1. 固定マスの配置
-        // ★修正: 1年生の時だけ0番をStartにする。それ以外はNormal（通過点）
-        BoardLayout[0] = (currentGrade == 1) ? "Start" : "Normal";
+        // ★修正: 1年生は "Start"、2年生以降は "Event" にする
+        if (currentGrade == 1)
+        {
+            BoardLayout[0] = "Start";
+        }
+        else
+        {
+            // 2,3年生はスタート地点がイベントマスになる
+            BoardLayout[0] = "Event";
+        }
 
-        BoardLayout[24] = "Middle"; // 中間地点
+        // 中間地点の設定（24番目のマス）
+        // ※もし2年生以降、中間地点もイベントマスにするならここも調整可能ですが、
+        //  要望にはなかったのでそのまま "Middle" にしておきます。
+        BoardLayout[24] = "Middle";
 
         // 学年ごとのゴール・ショップ配置
         if (currentGrade == 3)
@@ -36,7 +48,7 @@ public class BoardManager : MonoBehaviour
         }
         else
         {
-            BoardLayout[totalTiles - 1] = "Shop";
+            BoardLayout[totalTiles - 1] = "Shop"; // 次の階へ続く
         }
 
         // 教室マスの配置 (2年生以上)
@@ -56,17 +68,23 @@ public class BoardManager : MonoBehaviour
         if (currentGrade == 1)
         {
             AddTiles(p, "Shop", 1);
-            AddTiles(p, "Male", 12); AddTiles(p, "Event", 12);
-            AddTiles(p, "FriendPlus", 8); AddTiles(p, "GPPlus", 6);
-            AddTiles(p, "GPMinus", 4); AddTiles(p, "FriendMinus", 2);
+            AddTiles(p, "Male", 12);
+            AddTiles(p, "Event", 12);
+            AddTiles(p, "FriendPlus", 8);
+            AddTiles(p, "GPPlus", 6);
+            AddTiles(p, "GPMinus", 4);
+            AddTiles(p, "FriendMinus", 2);
         }
         else
         {
             // 2,3年生用バランス
             if (currentGrade == 2) AddTiles(p, "Shop", 1);
-            AddTiles(p, "GPPlus", 10); AddTiles(p, "FriendPlus", 8);
-            AddTiles(p, "Event", 12); AddTiles(p, "GPMinus", 4);
-            AddTiles(p, "Male", 3); AddTiles(p, "FriendMinus", 2);
+            AddTiles(p, "GPPlus", 10);
+            AddTiles(p, "FriendPlus", 8);
+            AddTiles(p, "Event", 12);
+            AddTiles(p, "GPMinus", 4);
+            AddTiles(p, "Male", 3);
+            AddTiles(p, "FriendMinus", 2);
         }
 
         // シャッフル

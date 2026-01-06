@@ -146,6 +146,22 @@ public class EventManager : MonoBehaviour
         // 完了通知
         onComplete?.Invoke();
     }
+
+
+    // EventManager.cs クラス内に以下のメソッドを追加してください
+
+    // ★追加: ボタン1つ（OKのみ）の簡易メッセージ表示用
+    public void ShowMessage(string content, UnityAction onConfirm = null)
+    {
+        // 既存のShowChoicePanelを流用して、ボタン1つのウィンドウを出す
+        ShowChoicePanel(
+            content,
+            new string[] { "OK" },
+            new UnityAction[] { onConfirm }
+        );
+    }
+
+
     public void ShowOptions(string title, string description, string btn1Txt, string btn2Txt, string btn3Txt, UnityAction act1, UnityAction act2, UnityAction act3)
     {
         // 説明文(description)を表示する場所がない場合、タイトルに改行して結合して表示します
