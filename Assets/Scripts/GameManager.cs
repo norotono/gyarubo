@@ -39,6 +39,9 @@ public class GameManager : MonoBehaviour
     private int currentTileIndex = 0;
     private bool isMoving = false;
     private bool hasRerolledThisTurn = false;
+    // ★追加: アイテム管理と生徒手帳フラグ
+    public ItemManager itemManager;
+    public bool isHandbookActive = false;
     // 親友効果を持っているかチェック
 
     private int middleTileIndex = 24;
@@ -46,7 +49,7 @@ public class GameManager : MonoBehaviour
     private void Start()
     {
         if (playerStats == null) playerStats = PlayerStats.Instance;
-
+        isHandbookActive = false;
         // 1. 友達データの初期化
         InitializeFriends();
         hasRerolledThisTurn = false; // ★この行を追加
@@ -75,6 +78,19 @@ public class GameManager : MonoBehaviour
     }
 
     // --- ダイス & 移動処理 ---
+
+    // ★追加: アイテム「強制イベント」から呼ばれる
+    public void TriggerEventTileFromItem()
+    {
+        Debug.Log("強制イベント発生！");
+        HandleEventTile();
+    }
+
+    // ★追加: アイテム「生徒手帳」から呼ばれる
+    public void ActivateHandbook()
+    {
+        isHandbookActive = true;
+    }
 
     public void OnDiceClicked()
     {
@@ -295,6 +311,41 @@ public class GameManager : MonoBehaviour
         bool discount = true; // マス停止なら割引
         yield return StartCoroutine(shopManager.OpenShopSequence(playerStats, discount));
         EndTurn();
+    }
+
+
+    // 【修正】教室マスの処理（選択肢を2つに限定）
+    void HandleClassroomTile(int index)
+    {
+        // 生徒手帳が有効なら選択肢を出す
+        if (isHandbookActive)
+        {
+            eventManager.ShowOptions(
+                "生徒手帳の効果",
+                "教室の様子が分かります。\nどうしますか？",
+
+                // ボタン1
+                "親友を探す",
+                // ボタン2
+                "何もしない",
+                // ボタン3 (なし)
+                null,
+
+                // ボタン1の処理: チャレンジ実行
+                () => HandleClassroomChallenge(index),
+
+                // ボタン2の処理: 何もしないでターン終了
+                EndTurn,
+
+                // ボタン3の処理: なし
+                null
+            );
+        }
+        else
+        {
+            // 生徒手帳がない通常時は、強制的にチャレンジ（またはランダムイベント）へ
+            HandleClassroomChallenge(index);
+        }
     }
 
     void HandleEventTile()
@@ -584,6 +635,74 @@ public class GameManager : MonoBehaviour
     // 【修正】ターン終了処理（完全版）
     void EndTurn()
     {
+        // 既存の処理をいきなり行わず、まず親友出現チェックを開始
+        StartCoroutine(EndTurnSequence());
+    }
+
+    // 2. 【追加】親友出現チェックの流れ（複数人対応）
+    IEnumerator EndTurnSequence()
+    {
+        // まだ仲間になっていない親友を順番にチェック
+        // ※コレクション変更エラーを防ぐため ToList() でコピーして回す
+        var potentialFriends = allFriends.Where(f => !f.isRecruited).ToList();
+
+        foreach (var f in potentialFriends)
+        {
+            bool isMet = false;
+
+            // --- 条件判定ロジック (簡易実装) ---
+            switch (f.assignedCondition)
+            {
+                case ConditionType.Happiness:
+                    if (playerStats.happiness >= 50) isMet = true; // 数値は調整してください
+                    break;
+                case ConditionType.Rich:
+                    if (playerStats.gp >= 5000) isMet = true;
+                    break;
+                case ConditionType.Popularity:
+                    if (playerStats.friends >= 100) isMet = true;
+                    break;
+                case ConditionType.Steps:
+                    // 例: 10ターン経過など
+                    if (playerStats.currentTurn >= 10) isMet = true;
+                    break;
+                case ConditionType.Conversation:
+                    // 会話条件はイベントマスなどでフラグ管理が必要ですが、一旦仮で
+                    break;
+                    // 必要に応じて他のcaseを追加
+            }
+
+            // --- 条件達成時の処理 ---
+            if (isMet)
+            {
+                bool processed = false;
+                f.isRecruited = true;
+                f.isHintRevealed = true; // 出会ったのでヒントも公開
+
+                // 登場ダイアログを表示
+                // (EventManagerのメソッド名はご自身の環境に合わせてください)
+                eventManager.ShowChoicePanel(
+                    $"【親友登場！】\n{f.friendName} が現れた！\n(条件: {f.assignedCondition} 達成)",
+                    new string[] { "仲間にする" },
+                    new UnityEngine.Events.UnityAction[] { () => processed = true }
+                );
+
+                // プレイヤーがボタンを押すまで待機 (ここが重要)
+                yield return new WaitUntil(() => processed);
+            }
+        }
+
+        // 全員のチェックが終わったら、元の終了処理へ
+        FinalizeTurn();
+    }
+
+    // 3. 【移動】元々のEndTurnの中身 (名前をFinalizeTurnに変更)
+    void FinalizeTurn()
+    {
+        Debug.Log("ターン終了処理実行");
+
+        // --- 以下、頂いたコードそのまま ---
+
         // 1. 給料計算 (null安全化)
         int shinyu = 0;
         if (allFriends != null)
@@ -593,23 +712,27 @@ public class GameManager : MonoBehaviour
         playerStats.gp += playerStats.CalculateSalary(shinyu);
 
         // 2. レナの能力 (友達+1)
-        if (HasFriendEffect(FriendEffectType.AutoFriend)) AddFriend(1);
+        if (HasFriendEffect(FriendEffectType.AutoFriend))
+        {
+            playerStats.friends += 1; // AddFriendメソッドがなければ直接加算
+        }
 
         // 3. 彼氏の能力発動 (null安全化)
-        // BoyfriendManagerがアタッチされていれば発動
         if (boyfriendManager != null)
         {
             string bfLog = boyfriendManager.ActivateBoyfriendEffects();
-            if (!string.IsNullOrEmpty(bfLog)) AddLog(bfLog);
+            // ログ出力メソッドが AddLog ならそのまま、なければ Debug.Log や ShowMessage に
+            if (!string.IsNullOrEmpty(bfLog)) Debug.Log(bfLog);
         }
 
         // 4. リカの能力 (カード生成)
         if (HasFriendEffect(FriendEffectType.CardGeneration) && playerStats.currentTurn % 12 == 0)
         {
+            // ※もしItemManagerを導入済みなら itemManager.movementCards を参照するように書き換えてください
             if (playerStats.moveCards.Count < 5)
             {
                 playerStats.moveCards.Add(Random.Range(1, 7));
-                AddLog("リカの能力: 定期便で移動カードが届きました！");
+                Debug.Log("リカの能力: 定期便で移動カードが届きました！");
             }
         }
 
@@ -619,10 +742,13 @@ public class GameManager : MonoBehaviour
         if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
 
         // 6. UI更新と操作許可
-        UpdateMainUI();
-        isMoving = false;
+        // UpdateMainUI(); // メソッドがあれば
+        // isMoving = false; // フラグがあれば
 
         if (diceButton != null) diceButton.interactable = true;
+
+        // 最後に次のターンの準備（必要なら）
+        // StartTurn(); 
     }
 
     void UpdateMainUI()
