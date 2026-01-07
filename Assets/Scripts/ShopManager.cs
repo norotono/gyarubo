@@ -12,6 +12,7 @@ public class ShopManager : MonoBehaviour
     public GameObject shopItemPrefab;
     public TextMeshProUGUI shopInfoText;
     public GameObject shopCloseButton;
+    public ItemManager itemManager;
 
     // 内部ステート
     private List<ShopItem> shopItems = new List<ShopItem>();
@@ -26,25 +27,55 @@ public class ShopManager : MonoBehaviour
     private List<ActiveShopButton> currentShopButtons = new List<ActiveShopButton>();
 
     // 外部（GameManager）からアイテム定義を初期化
+    // ★修正: アイテム定義の初期化メソッド
     public void InitializeShopItems(int grade, PlayerStats stats)
     {
         shopItems.Clear();
+
+        // --- 1. 生徒手帳 ---
         shopItems.Add(new ShopItem("生徒手帳", 200, "教室用", () => stats.studentIdCount++));
-        shopItems.Add(new ShopItem("移動カード", 150, "ランダム", () => stats.moveCards.Add(Random.Range(1, 7))));
+
+        // --- 2. 移動カード（変更点） ---
+        // 直接追加せず、ItemManagerのメソッドを呼んで上限チェックを行う
+        shopItems.Add(new ShopItem("移動カード", 150, "ランダム", () => {
+            if (itemManager != null)
+            {
+                itemManager.BuyOrGetMoveCard();
+            }
+            else
+            {
+                Debug.LogError("ShopManagerにItemManagerが設定されていません！");
+            }
+        }));
+
+        // --- 3. プレゼント ---
         shopItems.Add(new ShopItem("プレゼント", 500, "親密度UP", () => {
-            // GameManagerなどを経由してBoyfriendManagerを呼ぶのが理想ですが、
-            // 簡易的に直接ロジックを書くか、Manager参照を持たせます。
-            // ここでは一番簡単な「GameManager経由」を想定
             var bfMgr = FindObjectOfType<BoyfriendManager>();
             if (bfMgr)
             {
-                string log = bfMgr.IncreaseAffection(30f); // プレゼントは固定+30とする
+                string log = bfMgr.IncreaseAffection(30f);
                 Debug.Log(log);
             }
         }));
-        shopItems.Add(new ShopItem("イベント強制", 800, "マス無視", () => stats.eventForce++));
-        shopItems.Add(new ShopItem("ステータスUP", 1500, "Lv+1", () => stats.commuLv++));
 
+        // --- 4. 強制イベント ---
+        shopItems.Add(new ShopItem("イベント強制", 800, "マス無視", () => stats.eventForce++));
+
+        // --- 5. ステータスUP（変更点：3種類に分割） ---
+        shopItems.Add(new ShopItem("会話術の本", 1500, "コミュLv+1", () => {
+            stats.commuLv++;
+            Debug.Log("コミュ力が上がった！");
+        }));
+        shopItems.Add(new ShopItem("流行コスメ", 1500, "ギャルLv+1", () => {
+            stats.galLv++;
+            Debug.Log("ギャル力が上がった！");
+        }));
+        shopItems.Add(new ShopItem("恋愛小説", 1500, "レモンLv+1", () => {
+            stats.lemonLv++;
+            Debug.Log("レモン力が上がった！");
+        }));
+
+        // --- 6. 3年生限定アイテム ---
         if (grade == 3)
         {
             shopItems.Add(new ShopItem("卒業写真", 100, "友+1", () => stats.friends++));

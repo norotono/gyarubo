@@ -207,6 +207,46 @@ public class MenuManager : MonoBehaviour
             actionButton.gameObject.SetActive(false);
         }
     }
+    public void OpenCardDiscardMenu(List<int> currentCards, int newCard, UnityEngine.Events.UnityAction<int> onDecision)
+    {
+        ClearList(); // 既存のリストをクリア
+
+        // ヘッダーと詳細パネルを使って状況を説明
+        headerText.text = "【カードがいっぱいです】";
+
+        detailPanel.SetActive(true);
+        detailTitle.text = "どれを捨てますか？";
+        detailDesc.text = $"手持ちが上限(5枚)です。\n新しく出たカード: <size=150%>{newCard}</size>\n\n捨てるカードを選んでください。\n(※選んだカードが消滅し、新しいカードが入ります)";
+
+        // アクションボタン（「使う」など）は今回は邪魔なので消す
+        if (actionButton != null) actionButton.gameObject.SetActive(false);
+
+        // 1. 既存の手持ちカードを「捨てる」ボタンとして生成
+        for (int i = 0; i < currentCards.Count; i++)
+        {
+            int cardVal = currentCards[i];
+            int index = i; // クロージャキャプチャ用（重要）
+
+            CreateListButton($"手持ち: [{cardVal}] を捨てる", () => {
+                // 決定処理
+                CloseDetail();     // メニュー詳細を閉じる
+                ClearList();       // リストも消す
+                headerText.text = ""; // ヘッダー戻す（必要に応じて）
+                onDecision(index); // 選んだインデックスを返す
+            });
+        }
+
+        // 2. 新しく引いたカードを「諦める」ボタン
+        CreateListButton($"新規: [{newCard}] を諦める", () => {
+            CloseDetail();
+            ClearList();
+            headerText.text = "";
+            onDecision(currentCards.Count); // リスト外のインデックス＝新規破棄扱い
+        });
+
+        // ★レイアウト更新の強制（ボタンが表示されない対策の一つとして）
+        LayoutRebuilder.ForceRebuildLayoutImmediate(listContent.GetComponent<RectTransform>());
+    }
 
     public void CloseDetail()
     {

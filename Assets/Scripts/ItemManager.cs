@@ -16,6 +16,59 @@ public class ItemManager : MonoBehaviour
 
     // --- 便利な集計メソッド ---
 
+
+    // ★追加: カードを入手・購入する際の共通メソッド
+    // ショップやイベントからはこのメソッドを呼ぶようにする
+    public void BuyOrGetMoveCard()
+    {
+        // 1. 新しいカードの数値を決定
+        int newCardValue = Random.Range(1, 7);
+
+        // 2. 所持数チェック
+        if (movementCards.Count < MaxCards)
+        {
+            // 枠が空いていればそのまま追加
+            movementCards.Add(newCardValue);
+            Debug.Log($"移動カード [{newCardValue}] を入手しました。");
+
+            // メッセージ表示（EventManagerがあれば使う）
+            if (eventManager != null)
+                eventManager.ShowMessage($"移動カード [{newCardValue}] を手に入れました！");
+        }
+        else
+        {
+            // 3. 枠がいっぱいなら取捨選択画面へ
+            StartCoroutine(ShowCardDiscardFlow(newCardValue));
+        }
+    }
+
+    // ★追加: カード取捨選択フロー
+    private IEnumerator ShowCardDiscardFlow(int newCard)
+    {
+        // MenuManagerに「カード整理モード」での表示を依頼
+        // 第3引数はコールバック（ユーザーが選んだインデックスが返ってくる）
+        menuManager.OpenCardDiscardMenu(movementCards, newCard, (discardIndex) => {
+
+            // discardIndexが 0～4 なら、その位置の手持ちカードを捨てる
+            // discardIndexが 5 (movementCards.Count) なら、今回出た新しいカードを捨てる
+
+            if (discardIndex < movementCards.Count)
+            {
+                // 手持ちを捨てて、新しいのを入れる
+                int dropped = movementCards[discardIndex];
+                movementCards[discardIndex] = newCard; // 上書き（入れ替え）
+                Debug.Log($"移動カード [{dropped}] を捨てて、[{newCard}] を入手しました。");
+            }
+            else
+            {
+                // 今回引いたものを捨てる（何もしない）
+                Debug.Log($"移動カード [{newCard}] を諦めました。");
+            }
+        });
+
+        yield return null;
+    }
+
     // 移動カードを番号ごとに集計して返す辞書
     public Dictionary<int, int> GetCardCounts()
     {
