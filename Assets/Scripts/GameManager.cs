@@ -46,6 +46,30 @@ public class GameManager : MonoBehaviour
 
     private int middleTileIndex = 24;
 
+
+    // ★追加: GP獲得処理 (ギャル力ボーナス適用)
+    // 既存の HandleBlueTile などで gp += ... としている部分をこれに置き換えてください
+    public void AddGP(int amount)
+    {
+        int bonus = playerStats.GetGalGpBonus();
+        int total = amount + bonus;
+        playerStats.gp += total;
+
+        // ログ出力例 (AddLogなどがある場合)
+        Debug.Log($"GPを {total} (基本{amount} + ギャル{bonus}) 獲得しました。");
+        if (phoneUI) phoneUI.UpdateStatusUI(); // UI更新があれば呼ぶ
+    }
+
+    // ★追加: 友達獲得処理 (コミュ力ボーナス適用)
+    public void AddFriends(int count)
+    {
+        int bonus = playerStats.GetCommuFriendBonus();
+        int total = count + bonus;
+        playerStats.friends += total;
+
+        Debug.Log($"友達が {total}人 (基本{count} + コミュ{bonus}) 増えました。");
+        if (phoneUI) phoneUI.UpdateStatusUI();
+    }
     private void Start()
     {
         if (playerStats == null) playerStats = PlayerStats.Instance;
@@ -252,7 +276,7 @@ public class GameManager : MonoBehaviour
                 // ★追加: ミレイの能力 (GP獲得1.5倍)
                 if (HasFriendEffect(FriendEffectType.GPMultiplier)) gVal = (int)(gVal * 1.5f);
 
-                playerStats.gp += gVal;
+                AddGP(gVal);
                 playerStats.gpIncreaseTileCount++;
                 break;
 
@@ -262,7 +286,7 @@ public class GameManager : MonoBehaviour
                 {
                     int bonus = 100 * mult;
                     if (HasFriendEffect(FriendEffectType.GPMultiplier)) bonus = (int)(bonus * 1.5f);
-                    playerStats.gp += bonus;
+                    AddGP(bonus);
                     AddLog("ノアの能力: GP減少を回避して逆に獲得！");
                     break;
                 }
@@ -289,7 +313,7 @@ public class GameManager : MonoBehaviour
                 {
                     int bonus = 100 * mult;
                     if (HasFriendEffect(FriendEffectType.GPMultiplier)) bonus = (int)(bonus * 1.5f);
-                    playerStats.gp += bonus;
+                    AddGP(bonus);
                     AddLog("ノアの能力: 友達減少を回避してGPを獲得！");
                     break;
                 }
@@ -388,7 +412,7 @@ public class GameManager : MonoBehaviour
     void HandleEventTile()
     {
         // 男友達（彼氏含む）がいるか確認
-        bool hasBoys = playerStats.maleFriendsList.Count > 0;
+        bool hasBoys = playerStatsMaleFriendCount > 0;
 
         if (hasBoys)
         {
@@ -628,7 +652,7 @@ public class GameManager : MonoBehaviour
             // Action 1
             () =>
             {
-                playerStats.gp += 1000;
+                AddGP(1000);
                 Debug.Log("GP +1000");
                 EndTurn();
             },
@@ -648,7 +672,7 @@ public class GameManager : MonoBehaviour
             // Action 3
             () =>
             {
-                playerStats.friends += 10;
+                AddFriends(10);
                 Debug.Log("友達 +10人");
                 EndTurn();
             }
@@ -746,12 +770,12 @@ public class GameManager : MonoBehaviour
         {
             shinyu = allFriends.Count(f => f != null && f.isRecruited);
         }
-        playerStats.gp += playerStats.CalculateSalary(shinyu);
+        AddGP(playerStats.CalculateSalary(shinyu));
 
         // 2. レナの能力 (友達+1)
         if (HasFriendEffect(FriendEffectType.AutoFriend))
         {
-            playerStats.friends += 1; // AddFriendメソッドがなければ直接加算
+            AddFriends(1); // AddFriendメソッドがなければ直接加算
         }
 
         // 3. 彼氏の能力発動 (null安全化)

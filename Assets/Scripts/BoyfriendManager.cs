@@ -10,7 +10,7 @@ public class MaleFriendData
     public string name;
     public float currentAffection; // 0-100
     public bool isBoyfriend;
-    public BoyfriendType effectType;
+    public BoyfriendType effectType; // TypeA_Gp, TypeB_Friend
 
     public MaleFriendData(string n)
     {
@@ -43,91 +43,102 @@ public class BoyfriendManager : MonoBehaviour
     public void AddNewMaleFriend()
     {
         string baseName = nameDatabase[Random.Range(0, nameDatabase.Length)];
-        string newName = $"{baseName}{SafeMaleList.Count + 1}";
+        string uniqueName = baseName;
+        int count = 2;
+        while (SafeMaleList.Any(x => x.name == uniqueName) || playerStats.boyfriendList.Any(x => x.name == uniqueName))
+        {
+            uniqueName = baseName + count;
+            count++;
+        }
 
-        MaleFriendData newGuy = new MaleFriendData(newName);
-        SafeMaleList.Add(newGuy);
-        Debug.Log($"男友達追加: {newName}");
+        playerStats.maleFriendsList.Add(new MaleFriendData(uniqueName));
+        Debug.Log($"新しい男友達 {uniqueName} ができました！");
     }
 
-    // 【修正】親密度アップ
-    // targetIndex: -1 なら「全員（制限なし）」、0以上なら「そのインデックスの彼のみ」
-    public string IncreaseAffection(float amount, int targetIndex = -1)
+    // ★修正: 親密度アップ処理 (指定の計算式)
+    public string IncreaseAffection(float baseAmount, int targetIndex = -1)
     {
-        if (SafeMaleList.Count == 0) return "相手がいません";
+        if (playerStats.MaleFriendCount == 0) return "男友達がいません。";
+
+        // 1. 分子: イベント基準値 + レモン力Lv
+        float numerator = baseAmount + playerStats.GetEffectiveLemonLv();
+
+        // 2. 分母: 1 + (男友達+彼氏-1) * 0.5
+        // ※人数-1 がマイナスにならないよう調整
+        int totalMales = playerStats.TotalMaleCount;
+        float denominator = 1.0f + (Mathf.Max(0, totalMales - 1) * 0.5f);
+
+        // 3. 最終上昇量
+        float finalAmount = numerator / denominator;
 
         string resultMsg = "";
 
-        // ★ -1 (デフォルト) の場合は全員に加算
+        // 全員アップの場合
         if (targetIndex == -1)
         {
-            int count = 0;
-            foreach (var guy in SafeMaleList)
+            foreach (var guy in SafeMaleList.ToList()) // ToListでコピーして回す(昇格時の削除対策)
             {
-                if (guy == null) continue;
-
-                guy.currentAffection += amount;
-                CheckPromotion(guy);
-                count++;
+                guy.currentAffection += finalAmount;
+                CheckPromotion(guy); // 昇格チェック
             }
-            resultMsg = $"全員({count}名)の親密度が +{amount} されました！";
+            resultMsg = $"男友達全員の親密度 +{finalAmount:F1}\n(補正: {numerator}÷{denominator:F1})";
         }
         else
         {
-            // 特定の相手（デートイベントなど）
+            // 個別アップの場合 (既存コードの仕様維持)
             if (targetIndex >= 0 && targetIndex < SafeMaleList.Count)
             {
                 var guy = SafeMaleList[targetIndex];
-                if (guy != null)
-                {
-                    guy.currentAffection += amount;
-                    CheckPromotion(guy);
-                    resultMsg = $"{guy.name} の親密度 +{amount} (現在:{guy.currentAffection}%)";
-                }
+                guy.currentAffection += finalAmount;
+                CheckPromotion(guy);
+                resultMsg = $"{guy.name} の親密度 +{finalAmount:F1}";
             }
         }
 
         return resultMsg;
     }
 
-    // 昇格チェック
+    // ★修正: 昇格チェックとリスト移動
     void CheckPromotion(MaleFriendData guy)
     {
         if (!guy.isBoyfriend && guy.currentAffection >= 100f)
         {
             guy.isBoyfriend = true;
+            // 能力をランダム決定
             guy.effectType = (Random.Range(0, 2) == 0) ? BoyfriendType.TypeA_Gp : BoyfriendType.TypeB_Friend;
-            if (playerStats != null) playerStats.boyfriendCount++;
+
+            // ★重要: 男友達リストから削除し、彼氏リストへ移動
+            if (playerStats.maleFriendsList.Contains(guy))
+            {
+                playerStats.maleFriendsList.Remove(guy);
+            }
+            playerStats.boyfriendList.Add(guy);
+
             Debug.Log($"【祝】{guy.name} が彼氏になりました！");
         }
     }
 
-    // 毎ターンの効果
+    // ★修正: 毎ターンの効果発動 (実際に加算する)
     public string ActivateBoyfriendEffects()
     {
+        if (playerStats.BoyfriendCount == 0) return "";
+
         int totalGp = 0;
         int totalFriend = 0;
-        int count = 0;
 
-        foreach (var guy in SafeMaleList)
+        foreach (var bf in playerStats.boyfriendList)
         {
-            if (guy == null) continue;
-            if (guy.isBoyfriend)
-            {
-                count++;
-                if (guy.effectType == BoyfriendType.TypeA_Gp) totalGp += 500;
-                else if (guy.effectType == BoyfriendType.TypeB_Friend) totalFriend += 2;
-            }
+            if (bf.effectType == BoyfriendType.TypeA_Gp) totalGp += 500;
+            else if (bf.effectType == BoyfriendType.TypeB_Friend) totalFriend += 2;
         }
 
-        if (totalGp == 0 && totalFriend == 0) return null;
+        // 実際に加算
+        if (totalGp > 0) playerStats.gp += totalGp;
+        if (totalFriend > 0) playerStats.friends += totalFriend;
 
-        if (playerStats != null)
-        {
-            playerStats.gp += totalGp;
-            playerStats.friends += totalFriend;
-        }
+        if (totalGp > 0 || totalFriend > 0)
+            return $"彼氏ボーナス: GP+{totalGp}, 友達+{totalFriend}";
 
-        return $"彼氏({count}人)効果: GP+{totalGp}, 友+{totalFriend}";
+        return "";
     }
 }

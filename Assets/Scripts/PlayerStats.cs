@@ -5,12 +5,10 @@ using UnityEngine;
 [Serializable]
 public class PlayerStats : MonoBehaviour
 {
-    // シングルトン参照
     public static PlayerStats Instance;
 
     void Awake()
     {
-        // シングルトンの設定（他からアクセスしやすくするため）
         if (Instance == null) Instance = this;
     }
 
@@ -21,31 +19,35 @@ public class PlayerStats : MonoBehaviour
     // --- 時間管理 ---
     [Range(1, 3)] public int currentGrade = 1;
     public int currentTurn = 1;
-    public int currentMonth = 4; // 4月スタート
+    public int currentMonth = 4;
 
-    // --- ステータス (Lv0-5) ---
+    // --- ステータス ---
     public int commuLv = 0;
     public int galLv = 0;
     public int lemonLv = 0;
 
-    // --- 彼氏・男友達 ---
+    // --- 彼氏・男友達 (リストを分離) ---
     [Header("--- Friends & Love ---")]
-    public List<MaleFriendData> maleFriendsList = new List<MaleFriendData>(); // ★追加
-    public int boyfriendCount = 0;
-    public int maleFriendCount = 0;
-    public int boyfriendAbilityType = 0;
+    public List<MaleFriendData> maleFriendsList = new List<MaleFriendData>(); // 男友達
+
+    // ★追加: 彼氏リスト (管理を完全に分ける)
+    public List<MaleFriendData> boyfriendList = new List<MaleFriendData>();
+
+    // ★追加: 人数カウント用プロパティ
+    public int MaleFriendCount => maleFriendsList.Count;
+    public int BoyfriendCount => boyfriendList.Count;
+    public int TotalMaleCount => maleFriendsList.Count + boyfriendList.Count;
 
     // --- 所持アイテム ---
-    public List<int> moveCards = new List<int>();
+    public List<int> moveCards = new List<int>(); // 変数名統一
+    public const int MaxCards = 5;
+
     public int studentIdCount = 0;
     public int present = 0;
-    public int eventForce = 0; // イベント強制アイテム
-
-    // --- シングルプレイ用: 卒業アルバム価格 ---
+    public int eventForce = 0;
     public int albumPrice = 1000;
 
-    // --- 各種カウンタ（親友出現条件用） ---
-    // ★追加: 幸福度パラメータ（親友出現条件で使用）
+    // --- 各種パラメータ ---
     public int happiness = 0;
     public int maleContactCount = 0;
     public int gpIncreaseTileCount = 0;
@@ -55,20 +57,29 @@ public class PlayerStats : MonoBehaviour
     public int soloPlayConsecutive = 0;
     public int totalSteps = 0;
 
-    // --- 給料計算メソッド ---
+    // --- ★追加: ステータスボーナス計算ロジック ---
+
+    // ハーレムボーナス: 彼氏が3人以上なら全ステータス+1扱い
+    public int HaremBonus => (BoyfriendCount >= 3) ? 1 : 0;
+
+    // ステータスLv取得（ボーナス込み）
+    public int GetEffectiveCommuLv() => commuLv + HaremBonus;
+    public int GetEffectiveGalLv() => galLv + HaremBonus;
+    public int GetEffectiveLemonLv() => lemonLv + HaremBonus;
+
+    // 各ボーナス効果量
+    public int GetCommuFriendBonus() => GetEffectiveCommuLv() * 1;   // 友達獲得数
+    public int GetGalGpBonus() => GetEffectiveGalLv() * 100;         // GP獲得額
+
     public int CalculateSalary(int shinyuCount)
     {
-        // 基本給100 + 友達x10 + 親友x50
         return 100 + (friends * 10) + (shinyuCount * 50);
     }
 
-    // --- ステータス判定メソッド ---
     public bool IsAllStatsOver(int value)
     {
-        // 彼氏が3人以上なら全ステータス+1扱い（ハーレムボーナス）
-        int bonus = (boyfriendCount >= 3) ? 1 : 0;
-        return (commuLv + bonus) >= value &&
-               (galLv + bonus) >= value &&
-               (lemonLv + bonus) >= value;
+        return GetEffectiveCommuLv() >= value &&
+               GetEffectiveGalLv() >= value &&
+               GetEffectiveLemonLv() >= value;
     }
 }

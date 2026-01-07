@@ -23,6 +23,14 @@ public class MenuManager : MonoBehaviour
     public Button actionButton;         // 「使う」などのアクションボタン
     public TextMeshProUGUI actionBtnText; // ボタンの文字
 
+    // ★追加: 全画面オーバーレイ用UI (Unityエディタで設定が必要)
+    [Header("--- Full Screen Overlay UI ---")]
+    public GameObject fullScreenPanel;        // 画面全体を覆うパネル
+    public TextMeshProUGUI fullScreenTitle;   // タイトル
+    public TextMeshProUGUI fullScreenDesc;    // 説明文(数字など)
+    public Transform fullScreenButtonRoot;    // ボタンの親
+    public GameObject fullScreenButtonPrefab; // 大きめのボタンPrefab
+
     // --- 共通：リストクリア処理 ---
     void ClearList()
     {
@@ -252,9 +260,68 @@ public class MenuManager : MonoBehaviour
     {
         detailPanel.SetActive(false);
     }
+    // --- ★追加: カード入手時の確認 (Confirmation) ---
+    public void ShowCardConfirmation(int cardValue, UnityEngine.Events.UnityAction onOk)
+    {
+        fullScreenPanel.SetActive(true);
 
-    // 親友効果の説明文用（簡易）
-    string GetEffectDescription(FriendEffectType type)
+        // 既存ボタン削除
+        foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
+
+        fullScreenTitle.text = "移動カード購入";
+        fullScreenDesc.text = $"手に入れた数字は\n<size=200%><color=red>{cardValue}</color></size>\nです！";
+
+        // OKボタン生成
+        GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+        btn.GetComponentInChildren<TextMeshProUGUI>().text = "OK";
+        btn.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            fullScreenPanel.SetActive(false); // パネル閉じる
+            onOk.Invoke(); // 次の処理へ
+        });
+    }
+
+    // --- ★追加: カード取捨選択メニュー ---
+    public void OpenCardDiscardMenu(List<int> currentCards, int newCard, UnityEngine.Events.UnityAction<int> onDecision)
+    {
+        fullScreenPanel.SetActive(true);
+
+        foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
+
+        fullScreenTitle.text = "カード整理";
+        fullScreenDesc.text = "手持ちがいっぱいです(5枚)。\n捨てるカードを1枚選んでください。\n(残すカードではありません)";
+
+        // 1. 手持ちカード (0~4)
+        for (int i = 0; i < currentCards.Count; i++)
+        {
+            int cardVal = currentCards[i];
+            int index = i;
+
+            GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btn.GetComponentInChildren<TextMeshProUGUI>().text = $"手持ち[{cardVal}] を捨てる";
+            btn.GetComponent<Button>().onClick.AddListener(() => {
+                fullScreenPanel.SetActive(false);
+                onDecision(index);
+            });
+        }
+
+        // 2. 新規カード (5)
+        int newIndex = currentCards.Count;
+        GameObject newBtn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+        newBtn.GetComponentInChildren<TextMeshProUGUI>().text = $"新規[{newCard}] を諦める";
+        newBtn.GetComponentInChildren<TextMeshProUGUI>().color = Color.red;
+        newBtn.GetComponent<Button>().onClick.AddListener(() => {
+            fullScreenPanel.SetActive(false);
+            onDecision(newIndex);
+        });
+
+        // レイアウト更新
+        LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
+    }
+}
+
+// 親友効果の説明文用（簡易）
+string GetEffectDescription(FriendEffectType type)
     {
         switch (type)
         {
