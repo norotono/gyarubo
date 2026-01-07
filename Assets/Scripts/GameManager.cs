@@ -153,7 +153,7 @@ public class GameManager : MonoBehaviour
         yield return StartCoroutine(MovePlayer(diceResult));
     }
 
-    IEnumerator MovePlayer(int steps)
+    public IEnumerator MovePlayer(int steps)
     {
         // ★追加: 歩数カウントを加算 (親友条件: Steps用)
         playerStats.totalSteps += steps;

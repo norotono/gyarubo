@@ -1,148 +1,227 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
-using System.Text;
 using System.Collections.Generic;
+using System.Text;
 
 public class MenuManager : MonoBehaviour
 {
     public GameManager gameManager;
     public ItemManager itemManager;
 
-    [Header("UI References")]
-    public TextMeshProUGUI smartphoneText; // ƒXƒ}ƒz‰æ–Ê‚ÌŠÈˆÕ•\¦—p
-    public GameObject detailPanel;         // ‘S‰æ–ÊÚ×ƒpƒlƒ‹
-    public TextMeshProUGUI detailTitle;
-    public TextMeshProUGUI detailContent;
-    public Transform itemButtonContainer;  // ƒAƒCƒeƒ€ƒ{ƒ^ƒ“‚ğ•À‚×‚éeƒIƒuƒWƒFƒNƒg
-    public GameObject itemButtonPrefab;    // ƒAƒCƒeƒ€ƒ{ƒ^ƒ“‚ÌƒvƒŒƒnƒu
+    [Header("UI Containers")]
+    public Transform listContent; // ScrollViewã®Content (ã“ã“ã«ãƒœã‚¿ãƒ³ã‚’ä¸¦ã¹ã‚‹)
+    public GameObject listButtonPrefab; // ãƒ—ãƒ¬ãƒãƒ– (Button + TextMeshProUGUI)
 
-    // --- Šeƒƒjƒ…[ƒ{ƒ^ƒ“‚Ìˆ— ---
+    [Header("Smartphone Screen")]
+    public TextMeshProUGUI headerText; // ã‚¹ãƒãƒ›ç”»é¢ä¸Šéƒ¨ã®ã‚¿ã‚¤ãƒˆãƒ«è¡¨ç¤ºç”¨
 
+    [Header("Detail Panel")]
+    public GameObject detailPanel;      // è©³ç´°ãƒ‘ãƒãƒ«å…¨ä½“
+    public TextMeshProUGUI detailTitle; // è©³ç´°ã‚¿ã‚¤ãƒˆãƒ«
+    public TextMeshProUGUI detailDesc;  // è©³ç´°æœ¬æ–‡
+    public Button actionButton;         // ã€Œä½¿ã†ã€ãªã©ã®ã‚¢ã‚¯ã‚·ãƒ§ãƒ³ãƒœã‚¿ãƒ³
+    public TextMeshProUGUI actionBtnText; // ãƒœã‚¿ãƒ³ã®æ–‡å­—
+
+    // --- å…±é€šï¼šãƒªã‚¹ãƒˆã‚¯ãƒªã‚¢å‡¦ç† ---
+    void ClearList()
+    {
+        foreach (Transform child in listContent)
+        {
+            Destroy(child.gameObject);
+        }
+        detailPanel.SetActive(false); // è©³ç´°ãƒ‘ãƒãƒ«ã‚‚é–‰ã˜ã¦ãŠã
+    }
+
+    // --- 1. æƒ…å ±ãƒœã‚¿ãƒ³ (ç”·å­ã‹ã‚‰èã„ãŸè©±) ---
     public void OnInfoBtn()
     {
-        // ’jq‚©‚ç•·‚¢‚½ƒqƒ“ƒgˆê——
-        StringBuilder sb = new StringBuilder("y”é–§‚Ì‰\z\n\n");
+        ClearList();
+        headerText.text = "ã€ç§˜å¯†ã®æƒ…å ±ã€‘";
+
         foreach (var f in gameManager.allFriends)
         {
+            // ãƒ’ãƒ³ãƒˆãŒå…¬é–‹ã•ã‚Œã¦ã„ã‚‹ã‚­ãƒ£ãƒ©ã®ã¿è¡¨ç¤º
             if (f.isHintRevealed)
             {
-                sb.AppendLine($"¡ {f.friendName}");
-                sb.AppendLine($"  {f.GetHintText()}");
-                sb.AppendLine("");
+                CreateListButton(f.friendName, () =>
+                {
+                    ShowDetail(f.friendName, $"ã€å‡ºç¾æ¡ä»¶ãƒ’ãƒ³ãƒˆã€‘\n\n{f.GetHintText()}", null);
+                });
             }
         }
-        smartphoneText.text = "”é–§‚Ì‰\‚ğ•\¦’†...";
-        ShowDetail("”é–§‚Ìî•ñ", sb.ToString());
     }
 
-    public void OnMaleFriendBtn()
-    {
-        var list = gameManager.playerStats.maleFriendsList;
-        StringBuilder sb = new StringBuilder($"y’j—F’BƒŠƒXƒgz(Œv{list.Count}l)\n\n");
-
-        foreach (var m in list)
-        {
-            string status = m.isBoyfriend ? "Is Boyfriend" : "Friend";
-            sb.AppendLine($"{m.name}: DŠ´“x {m.currentAffection:F0}% [{status}]");
-        }
-
-        smartphoneText.text = "’j—F’BƒŠƒXƒg‚ğ•\¦’†...";
-        ShowDetail("’j—F’BE”Ş", sb.ToString());
-    }
-
-    public void OnBoyfriendBtn()
-    {
-        var list = gameManager.playerStats.maleFriendsList;
-        StringBuilder sb = new StringBuilder("y”Şƒ{[ƒiƒXz\n\n");
-        int bfCount = 0;
-        foreach (var m in list)
-        {
-            if (m.isBoyfriend)
-            {
-                sb.AppendLine($"¡ {m.name}");
-                sb.AppendLine($"  Œø‰Ê: {m.effectType}");
-                sb.AppendLine("");
-                bfCount++;
-            }
-        }
-        if (bfCount == 0) sb.Append("”Ş‚Í‚Ü‚¾‚¢‚Ü‚¹‚ñB");
-
-        smartphoneText.text = "”Şî•ñ‚ğ•\¦’†...";
-        ShowDetail("”Şî•ñ", sb.ToString());
-    }
-
+    // --- 2. è¦ªå‹ãƒœã‚¿ãƒ³ ---
     public void OnShinyuBtn()
     {
-        StringBuilder sb = new StringBuilder("ye—Fˆê——z\n\n");
+        ClearList();
+        headerText.text = "ã€è¦ªå‹ãƒªã‚¹ãƒˆã€‘";
+
         foreach (var f in gameManager.allFriends)
         {
             if (f.isRecruited)
             {
-                sb.AppendLine($"š {f.friendName}");
-                sb.AppendLine($"  ”\—Í: {f.effectType}");
-            }
-            else
-            {
-                sb.AppendLine($"E{f.friendName} (–¢‰Á“ü)");
+                CreateListButton(f.friendName, () =>
+                {
+                    ShowDetail(f.friendName, $"ã€è¦ªå‹åŠ¹æœã€‘\n\nã‚¿ã‚¤ãƒ—: {f.effectType}\n{GetEffectDescription(f.effectType)}", null);
+                });
             }
         }
-        smartphoneText.text = "e—FƒŠƒXƒg‚ğ•\¦’†...";
-        ShowDetail("e—F}ŠÓ", sb.ToString());
     }
 
-    // ƒAƒCƒeƒ€ƒ{ƒ^ƒ“‚Í“Á•ÊFƒ{ƒ^ƒ“‚ğ¶¬‚µ‚Ä•À‚×‚é
+    // --- 3. ç”·å‹é”ãƒœã‚¿ãƒ³ ---
+    public void OnMaleFriendBtn()
+    {
+        ClearList();
+        headerText.text = "ã€ç”·å‹é”ã€‘";
+
+        foreach (var m in gameManager.playerStats.maleFriendsList)
+        {
+            if (!m.isBoyfriend)
+            {
+                string label = $"{m.name} (â™¡{m.currentAffection:F0})";
+                CreateListButton(label, () =>
+                {
+                    ShowDetail(m.name, $"ç¾åœ¨ã®è¦ªå¯†åº¦: {m.currentAffection:F0}\n\nä»²è‰¯ããªã‚Œã°å½¼æ°ã«ãªã‚‹ã‹ã‚‚ï¼Ÿ", null);
+                });
+            }
+        }
+    }
+
+    // --- 4. å½¼æ°ãƒœã‚¿ãƒ³ ---
+    public void OnBoyfriendBtn()
+    {
+        ClearList();
+        headerText.text = "ã€å½¼æ°ã€‘";
+
+        foreach (var m in gameManager.playerStats.maleFriendsList)
+        {
+            if (m.isBoyfriend)
+            {
+                CreateListButton(m.name, () =>
+                {
+                    ShowDetail(m.name, $"ã€å½¼æ°ãƒœãƒ¼ãƒŠã‚¹ã€‘\nã‚¿ã‚¤ãƒ—: {m.effectType}\næ¯ã‚¿ãƒ¼ãƒ³çµ‚äº†æ™‚ã«ãƒœãƒ¼ãƒŠã‚¹ã‚’ãã‚Œã¾ã™ã€‚", null);
+                });
+            }
+        }
+    }
+
+    // --- 5. ã‚¢ã‚¤ãƒ†ãƒ ãƒœã‚¿ãƒ³ ---
     public void OnItemBtn()
     {
-        smartphoneText.text = "ƒAƒCƒeƒ€‚ğ‘I‘ğ‚µ‚Ä‚­‚¾‚³‚¢";
-        ShowDetail("ŠƒAƒCƒeƒ€", ""); // “à—e‚ÍƒNƒŠƒA‚µ‚Äƒ{ƒ^ƒ“‚ğ•À‚×‚é
-        RefreshItemDisplay();
+        RefreshItemList();
     }
 
-    // ƒAƒCƒeƒ€ƒŠƒXƒg‚ÌÄ•`‰æ
-    public void RefreshItemDisplay()
+    // å…¬é–‹ãƒ¡ã‚½ãƒƒãƒ‰ã«ã—ã¦ItemManagerã‹ã‚‰ã‚‚å‘¼ã¹ã‚‹ã‚ˆã†ã«ã™ã‚‹
+    public void RefreshItemList()
     {
-        // Šù‘¶‚Ìƒ{ƒ^ƒ“‚ğíœ
-        foreach (Transform child in itemButtonContainer) Destroy(child.gameObject);
+        ClearList();
+        headerText.text = "ã€æ‰€æŒã‚¢ã‚¤ãƒ†ãƒ ã€‘";
 
-        // 1. ˆÚ“®ƒJ[ƒh‚Ì•\¦
-        for (int i = 0; i < itemManager.movementCards.Count; i++)
+        // A. ç§»å‹•ã‚«ãƒ¼ãƒ‰ã®è¡¨ç¤º (1~6)
+        var cardCounts = itemManager.GetCardCounts();
+        foreach (var kvp in cardCounts)
         {
-            int cardVal = itemManager.movementCards[i];
-            GameObject btn = Instantiate(itemButtonPrefab, itemButtonContainer);
-            btn.GetComponentInChildren<TextMeshProUGUI>().text = $"ˆÚ“®ƒJ[ƒh [{cardVal}]";
+            int num = kvp.Key;   // ã‚«ãƒ¼ãƒ‰ã®æ•°å­—
+            int count = kvp.Value; // æšæ•°
 
-            // ˆÚ“®ƒJ[ƒh‚Íƒ_ƒCƒX‘ã‚í‚è‚Ég—piGameManager‚Ö˜AŒg‚ª•K—v‚¾‚ªA¡‰ñ‚ÍÚ×È—ªj
-            // ButtonƒRƒ“ƒ|[ƒlƒ“ƒg‚É‹@”\‚ğ‚½‚¹‚é‚È‚ç‚±‚±
+            if (count > 0)
+            {
+                string label = $"ç§»å‹•ã‚«ãƒ¼ãƒ‰ [{num}]  x{count}";
+                CreateListButton(label, () =>
+                {
+                    // ã‚«ãƒ¼ãƒ‰ã®è©³ç´°ã‚’è¡¨ç¤º
+                    ShowDetail(
+                        $"ç§»å‹•ã‚«ãƒ¼ãƒ‰ [{num}]",
+                        "ä½¿ç”¨ã™ã‚‹ã¨ã‚µã‚¤ã‚³ãƒ­ã‚’æŒ¯ã‚‰ãšã«ã€ã“ã®æ•°å­—ã®åˆ†ã ã‘é€²ã‚ã¾ã™ã€‚",
+                        () => itemManager.UseMovementCard(num), // ã‚¢ã‚¯ã‚·ãƒ§ãƒ³: ä½¿ç”¨
+                        "ä½¿ã†"
+                    );
+                });
+            }
         }
 
-        // 2. ŠƒAƒCƒeƒ€‚Ì•\¦
-        foreach (var item in itemManager.inventory)
+        // B. é€šå¸¸ã‚¢ã‚¤ãƒ†ãƒ ã®è¡¨ç¤º
+        var itemCounts = itemManager.GetItemCounts();
+        foreach (var kvp in itemCounts)
         {
-            GameObject btn = Instantiate(itemButtonPrefab, itemButtonContainer);
-            btn.GetComponentInChildren<TextMeshProUGUI>().text = item.itemName;
+            string iName = kvp.Key;
+            int count = kvp.Value;
 
-            // ƒ{ƒ^ƒ“‚ğ‰Ÿ‚µ‚½‚çƒAƒCƒeƒ€g—p
-            btn.GetComponent<Button>().onClick.AddListener(() => {
-                itemManager.UseItem(item);
+            string label = $"{iName}  x{count}";
+            CreateListButton(label, () =>
+            {
+                // ç”Ÿå¾’æ‰‹å¸³ã®å ´åˆ
+                if (iName == "ç”Ÿå¾’æ‰‹å¸³")
+                {
+                    ShowDetail(
+                        iName,
+                        "ã€åŠ¹æœã€‘\næ•™å®¤ãƒã‚¹ã«æ­¢ã¾ã£ãŸéš›ã€è¡Œå‹•ã‚’é¸æŠã§ãã‚‹ã‚ˆã†ã«ãªã‚Šã¾ã™ã€‚\n(â€»ã“ã“ã§ã¯ä½¿ç”¨ã§ãã¾ã›ã‚“ã€‚æ•™å®¤ãƒã‚¹ã§è‡ªå‹•çš„ã«é¸æŠè‚¢ãŒå‡ºã¾ã™)",
+                        null // ã‚¢ã‚¯ã‚·ãƒ§ãƒ³ãªã—
+                    );
+                }
+                // å¼·åˆ¶ã‚¤ãƒ™ãƒ³ãƒˆãªã©ãã®ä»–ã®å ´åˆ
+                else
+                {
+                    ShowDetail(
+                        iName,
+                        "ã€åŠ¹æœã€‘\nã“ã®ã‚¢ã‚¤ãƒ†ãƒ ã‚’ä½¿ç”¨ã—ã¾ã™ã‹ï¼Ÿ",
+                        () => itemManager.UseItemByName(iName), // ã‚¢ã‚¯ã‚·ãƒ§ãƒ³: ä½¿ç”¨
+                        "ä½¿ã†"
+                    );
+                }
             });
         }
     }
 
-    void ShowDetail(string title, string content)
+    // --- ãƒ˜ãƒ«ãƒ‘ãƒ¼ãƒ¡ã‚½ãƒƒãƒ‰ ---
+
+    // ãƒªã‚¹ãƒˆã®ãƒœã‚¿ãƒ³ã‚’ç”Ÿæˆã™ã‚‹
+    void CreateListButton(string label, UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject btnObj = Instantiate(listButtonPrefab, listContent);
+        btnObj.GetComponentInChildren<TextMeshProUGUI>().text = label;
+        btnObj.GetComponent<Button>().onClick.AddListener(onClick);
+    }
+
+    // è©³ç´°ãƒ‘ãƒãƒ«ã‚’è¡¨ç¤ºã™ã‚‹
+    // action: ãƒœã‚¿ãƒ³ã‚’æŠ¼ã—ãŸæ™‚ã®å‡¦ç† (nullãªã‚‰ãƒœã‚¿ãƒ³éè¡¨ç¤º)
+    // btnLabel: ãƒœã‚¿ãƒ³ã®ãƒ†ã‚­ã‚¹ãƒˆ (ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã¯"ä½¿ã†")
+    void ShowDetail(string title, string content, UnityEngine.Events.UnityAction action, string btnLabel = "ä½¿ã†")
     {
         detailPanel.SetActive(true);
         detailTitle.text = title;
-        detailContent.text = content;
+        detailDesc.text = content;
 
-        // ƒAƒCƒeƒ€ƒRƒ“ƒeƒi‚ÍƒAƒCƒeƒ€‰æ–Ê‚Ì‚Æ‚«‚¾‚¯—LŒø‰»‚È‚Ç‚Ì§Œä‚ª•K—v
-        bool isItemMode = (title == "ŠƒAƒCƒeƒ€");
-        itemButtonContainer.gameObject.SetActive(isItemMode);
-        detailContent.gameObject.SetActive(!isItemMode);
+        if (action != null)
+        {
+            actionButton.gameObject.SetActive(true);
+            actionBtnText.text = btnLabel;
+            actionButton.onClick.RemoveAllListeners();
+            actionButton.onClick.AddListener(action);
+        }
+        else
+        {
+            // ã‚¢ã‚¯ã‚·ãƒ§ãƒ³ãŒãªã„å ´åˆï¼ˆè¦‹ã‚‹ã ã‘ã®æ™‚ã‚„ç”Ÿå¾’æ‰‹å¸³ï¼‰ã¯ãƒœã‚¿ãƒ³ã‚’éš ã™
+            actionButton.gameObject.SetActive(false);
+        }
     }
 
     public void CloseDetail()
     {
         detailPanel.SetActive(false);
+    }
+
+    // è¦ªå‹åŠ¹æœã®èª¬æ˜æ–‡ç”¨ï¼ˆç°¡æ˜“ï¼‰
+    string GetEffectDescription(FriendEffectType type)
+    {
+        switch (type)
+        {
+            case FriendEffectType.DiceReroll: return "1ã‚¿ãƒ¼ãƒ³ã«1åº¦ã€ãƒ€ã‚¤ã‚¹ã‚’æŒ¯ã‚Šç›´ã›ã¾ã™ã€‚";
+            case FriendEffectType.CardGeneration: return "å®šæœŸçš„ã«ç§»å‹•ã‚«ãƒ¼ãƒ‰ã‚’ãã‚Œã¾ã™ã€‚";
+            case FriendEffectType.AutoFriend: return "æ¯ã‚¿ãƒ¼ãƒ³ã€å‹é”ã‚’1äººé€£ã‚Œã¦ãã¾ã™ã€‚";
+            default: return "ç‰¹åˆ¥ãªåŠ¹æœã¯ã‚ã‚Šã¾ã›ã‚“ã€‚";
+        }
     }
 }
