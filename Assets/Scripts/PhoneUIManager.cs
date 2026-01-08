@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro; // TextMeshProを使用
+using TMPro;
 using System.Collections.Generic;
 
 public class PhoneUIManager : MonoBehaviour
@@ -21,7 +21,64 @@ public class PhoneUIManager : MonoBehaviour
     public Transform choiceRoot;      // 選択肢ボタンの親オブジェクト
     public GameObject choiceButtonPrefab;
 
-    // --- モード切替 ---
+    // ★追加: ステータス表示・ログ制御用
+    [Header("Status & Log Settings")]
+    public TextMeshProUGUI headerDateText; // 画面上部の日付
+    public TextMeshProUGUI statusText;     // ステータス表示
+    public ScrollRect logScrollRect;       // ログのスクロールビュー
+    public PlayerStats playerStats;        // ステータス参照用
+
+    private void Start()
+    {
+        if (playerStats == null) playerStats = PlayerStats.Instance;
+        UpdateStatusUI();
+    }
+
+    // --- ★追加: GameManagerから呼ばれるステータス更新 ---
+    public void UpdateStatusUI()
+    {
+        if (playerStats == null) playerStats = PlayerStats.Instance;
+        if (playerStats == null) return;
+
+        // 日付の更新
+        if (headerDateText != null)
+        {
+            headerDateText.text = $"{playerStats.currentGrade}年 {playerStats.currentMonth}月";
+        }
+
+        // ステータスの更新
+        if (statusText != null)
+        {
+            // 必要な情報を表示（レイアウトに合わせて調整してください）
+            statusText.text = $"GP: {playerStats.gp:N0}\n" +
+                              $"友: {playerStats.friends}人\n" +
+                              $"コミュ: {playerStats.GetEffectiveCommuLv()}\n" +
+                              $"ギャル: {playerStats.GetEffectiveGalLv()}\n" +
+                              $"レモン: {playerStats.GetEffectiveLemonLv()}";
+        }
+    }
+
+    // --- ★追加: GameManagerから呼ばれるログ追加 ---
+    public void AddLog(string message)
+    {
+        if (logText != null)
+        {
+            logText.text += $"\n{message}";
+
+            // ログの自動スクロール（必要であれば）
+            if (logScrollRect != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                logScrollRect.verticalNormalizedPosition = 0f;
+            }
+        }
+        else
+        {
+            Debug.Log($"[PhoneLog] {message}");
+        }
+    }
+
+    // --- 以下、既存のモード切替・アイテム表示処理 ---
 
     public void ShowDiceMode()
     {
@@ -35,7 +92,7 @@ public class PhoneUIManager : MonoBehaviour
     {
         if (diceArea) diceArea.SetActive(false);
         if (dialogScroll) dialogScroll.SetActive(true);
-        if (itemPanel) itemPanel.SetActive(false); // ダイアログ中はアイテム欄を閉じる
+        if (itemPanel) itemPanel.SetActive(false);
 
         if (dialogText) dialogText.text = message;
 
@@ -43,55 +100,31 @@ public class PhoneUIManager : MonoBehaviour
         foreach (Transform child in choiceRoot) Destroy(child.gameObject);
     }
 
-    // 外部からログを追加するための関数
-    public void AddLog(string message)
+    // 選択肢ボタン生成
+    public void CreateChoiceButton(string label, UnityEngine.Events.UnityAction onClick)
     {
-        if (logText != null)
-        {
-            // 新しいログを上に追加していく
-            logText.text = $"> {message}\n" + logText.text;
-
-            // 文字数が多すぎたら古いものをカット（メモリ対策）
-            if (logText.text.Length > 1000)
-                logText.text = logText.text.Substring(0, 1000);
-        }
+        if (!choiceButtonPrefab) return;
+        GameObject btn = Instantiate(choiceButtonPrefab, choiceRoot);
+        btn.GetComponentInChildren<TextMeshProUGUI>().text = label;
+        btn.GetComponent<Button>().onClick.AddListener(onClick);
     }
 
-    // --- 選択肢ボタン生成 ---
-    public void CreateChoiceButton(string text, UnityEngine.Events.UnityAction onClickAction)
+    // アイテムメニュー表示（コールバック付き）
+    public void ShowItemMenu(PlayerStats stats, System.Action<string> onUseItem, System.Action<int> onUseCard)
     {
-        GameObject btnObj = Instantiate(choiceButtonPrefab, choiceRoot);
-        btnObj.GetComponentInChildren<TextMeshProUGUI>().text = text;
-        btnObj.GetComponent<Button>().onClick.AddListener(onClickAction);
-    }
+        if (!itemPanel) return;
 
-    // --- ステータス選択ダイアログ ---
-    public void ShowStatusSelection(UnityEngine.Events.UnityAction<string> onSelect, UnityEngine.Events.UnityAction onCancel)
-    {
-        ShowDialogMode("どのステータスを上げますか？");
-
-        CreateChoiceButton("コミュ力", () => onSelect("Commu"));
-        CreateChoiceButton("ギャル力", () => onSelect("Gal"));
-        CreateChoiceButton("レモン力", () => onSelect("Lemon"));
-        CreateChoiceButton("やめる", onCancel);
-    }
-
-    // --- アイテムメニュー表示 ---
-    // stats: 所持データ, onUseCard: カード使用時のコールバック(index), onUseItem: その他アイテム使用時のコールバック(key)
-    public void ShowItemMenu(PlayerStats stats, UnityEngine.Events.UnityAction<int> onUseCard, UnityEngine.Events.UnityAction<string> onUseItem)
-    {
-        if (itemPanel) itemPanel.SetActive(true);
-
-        // リストをリセット
+        itemPanel.SetActive(true);
+        // 中身をクリア
         foreach (Transform child in itemListRoot) Destroy(child.gameObject);
 
-        // 1. 移動カードの表示 (数字ごとにボタン化)
+        // 1. 移動カード表示
         if (stats.moveCards.Count > 0)
         {
             for (int i = 0; i < stats.moveCards.Count; i++)
             {
                 int cardValue = stats.moveCards[i];
-                int listIndex = i; // クロージャキャプチャ用
+                int listIndex = cardValue; // カードの値を使用
 
                 GameObject btn = Instantiate(itemButtonPrefab, itemListRoot);
                 btn.GetComponentInChildren<TextMeshProUGUI>().text = $"移動 [{cardValue}]";
@@ -117,8 +150,6 @@ public class PhoneUIManager : MonoBehaviour
         // 閉じるボタン
         CreateItemBtn("閉じる", () => itemPanel.SetActive(false));
     }
-
-
 
     void CreateItemBtn(string label, UnityEngine.Events.UnityAction action)
     {

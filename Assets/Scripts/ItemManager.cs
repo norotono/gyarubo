@@ -11,13 +11,11 @@ public class ItemManager : MonoBehaviour
     public MenuManager menuManager;
 
     public const int MaxCards = 5;
-    // playerStats.moveCards を参照するため、ローカルのリスト変数は削除しても良いが
-    // 既存コードとの兼ね合いで残す場合は同期が必要。
-    // 今回は playerStats.moveCards を正として扱います。
 
+    // アイテムデータリスト（インスペクターで設定）
     public List<ItemData> inventory = new List<ItemData>();
 
-    // --- アイテム所持数カウントなど (既存のまま) ---
+    // --- アイテム所持数カウント ---
     public Dictionary<string, int> GetItemCounts()
     {
         Dictionary<string, int> counts = new Dictionary<string, int>();
@@ -29,44 +27,56 @@ public class ItemManager : MonoBehaviour
         return counts;
     }
 
-    // ★追加: カード購入・入手フロー
+    // ★追加: カード枚数カウント（MenuManagerのエラー修正用）
+    public Dictionary<int, int> GetCardCounts()
+    {
+        Dictionary<int, int> counts = new Dictionary<int, int>();
+        // 1~6のキーを初期化
+        for (int i = 1; i <= 6; i++) counts[i] = 0;
+
+        if (playerStats != null)
+        {
+            foreach (var card in playerStats.moveCards)
+            {
+                if (counts.ContainsKey(card)) counts[card]++;
+            }
+        }
+        return counts;
+    }
+
+    // カード購入・入手フロー
     public void BuyOrGetMoveCard()
     {
-        // 1. 数字抽選
         int newCardValue = Random.Range(1, 7);
 
-        // 2. MenuManager経由で「入手した数字」を全画面表示
-        // OKを押したら所持数チェックへ進む
+        // MenuManager経由で「入手した数字」を全画面表示
         menuManager.ShowCardConfirmation(newCardValue, () =>
         {
             CheckCardLimit(newCardValue);
         });
     }
 
-    // ★追加: 所持数チェック
+    // 所持数チェック
     private void CheckCardLimit(int newCard)
     {
-        var currentCards = playerStats.moveCards;
+        List<int> cards = playerStats.moveCards;
 
-        if (currentCards.Count < MaxCards)
+        if (cards.Count < MaxCards)
         {
-            // 5枚未満ならそのまま入手
-            currentCards.Add(newCard);
+            cards.Add(newCard);
             Debug.Log($"移動カード[{newCard}]を入手しました。");
         }
         else
         {
-            // 5枚以上なら選択画面へ
             ShowDiscardDialog(newCard);
         }
     }
 
-    // ★追加: 捨てる選択画面の呼び出し
+    // 捨てる選択画面の呼び出し
     void ShowDiscardDialog(int newCard)
     {
         menuManager.OpenCardDiscardMenu(playerStats.moveCards, newCard, (selectedIndex) =>
         {
-            // selectedIndex: 0~4=手持ち, 5=新規
             if (selectedIndex < playerStats.moveCards.Count)
             {
                 int dropped = playerStats.moveCards[selectedIndex];
@@ -80,7 +90,7 @@ public class ItemManager : MonoBehaviour
         });
     }
 
-    // 移動カードの使用 (既存コード修正: PlayerStatsを参照)
+    // 移動カードの使用
     public void UseMovementCard(int cardValue)
     {
         if (playerStats.moveCards.Contains(cardValue))
@@ -88,11 +98,11 @@ public class ItemManager : MonoBehaviour
             playerStats.moveCards.Remove(cardValue);
             Debug.Log($"移動カード {cardValue} を使用");
             menuManager.CloseDetail();
-            gameManager.StartCoroutine(gameManager.MovePlayer(cardValue));
+            if (gameManager != null) gameManager.StartCoroutine(gameManager.MovePlayer(cardValue));
         }
     }
 
-    // アイテムの使用 (既存のまま)
+    // アイテムの使用
     public void UseItemByName(string itemName)
     {
         var item = inventory.FirstOrDefault(x => x.itemName == itemName);
@@ -107,7 +117,7 @@ public class ItemManager : MonoBehaviour
         }
         else if (itemName == "生徒手帳")
         {
-            eventManager.ShowMessage("生徒手帳は「教室マス」に止まった時に自動で使用選択肢が出ます。");
+            if (eventManager) eventManager.ShowMessage("生徒手帳は「教室マス」に止まった時に自動で使用選択肢が出ます。");
         }
 
         if (used)
