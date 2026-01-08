@@ -10,46 +10,83 @@ public class MenuManager : MonoBehaviour
     public ItemManager itemManager;
 
     [Header("UI Containers")]
-    public Transform listContent; // ScrollViewのContent (ここにボタンを並べる)
-    public GameObject listButtonPrefab; // プレハブ (Button + TextMeshProUGUI)
+    public Transform listContent; 
+    public GameObject listButtonPrefab; 
 
     [Header("Smartphone Screen")]
-    public TextMeshProUGUI headerText; // スマホ画面上部のタイトル表示用
+    public TextMeshProUGUI headerText; 
 
     [Header("Detail Panel")]
-    public GameObject detailPanel;      // 詳細パネル全体
-    public TextMeshProUGUI detailTitle; // 詳細タイトル
-    public TextMeshProUGUI detailDesc;  // 詳細本文
-    public Button actionButton;         // 「使う」などのアクションボタン
-    public TextMeshProUGUI actionBtnText; // ボタンの文字
+    public GameObject detailPanel;      
+    public TextMeshProUGUI detailTitle; 
+    public TextMeshProUGUI detailDesc;  
+    public Button actionButton;         
+    public TextMeshProUGUI actionBtnText; 
 
-    // ★追加: 全画面オーバーレイ用UI
     [Header("--- Full Screen Overlay UI ---")]
-    public GameObject fullScreenPanel;        // 画面全体を覆うパネル
-    public TextMeshProUGUI fullScreenTitle;   // タイトル
-    public TextMeshProUGUI fullScreenDesc;    // 説明文(数字など)
-    public Transform fullScreenButtonRoot;    // ボタンの親
-    public GameObject fullScreenButtonPrefab; // 大きめのボタンPrefab
+    public GameObject fullScreenPanel;        
+    public TextMeshProUGUI fullScreenTitle;   
+    public TextMeshProUGUI fullScreenDesc;    
+    public Transform fullScreenButtonRoot;    
+    public GameObject fullScreenButtonPrefab; 
 
-    // --- 共通：リストクリア処理 ---
-    void ClearList()
+    // --- 教室イベント用パネル表示（追加） ---
+    public void ShowClassroomPanel(bool hasHandbook, UnityEngine.Events.UnityAction onInvestigate, UnityEngine.Events.UnityAction onCancel)
     {
-        foreach (Transform child in listContent)
+        fullScreenPanel.SetActive(true);
+        foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
+
+        fullScreenTitle.text = "教室イベント";
+        
+        if (!hasHandbook)
         {
-            Destroy(child.gameObject);
+            fullScreenDesc.text = "生徒手帳がないよ！\n中を調べることはできません。";
+            
+            // 戻るボタンのみ
+            GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btn.GetComponentInChildren<TextMeshProUGUI>().text = "戻る";
+            btn.GetComponent<Button>().onClick.AddListener(() => {
+                fullScreenPanel.SetActive(false);
+                onCancel.Invoke();
+            });
         }
-        detailPanel.SetActive(false); // 詳細パネルも閉じておく
+        else
+        {
+            fullScreenDesc.text = "生徒手帳を持っています。\n教室の中を調べますか？";
+
+            // 調べるボタン
+            GameObject btn1 = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btn1.GetComponentInChildren<TextMeshProUGUI>().text = "調べる";
+            btn1.GetComponent<Button>().onClick.AddListener(() => {
+                fullScreenPanel.SetActive(false);
+                onInvestigate.Invoke();
+            });
+
+            // やめるボタン
+            GameObject btn2 = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btn2.GetComponentInChildren<TextMeshProUGUI>().text = "やめる";
+            btn2.GetComponent<Button>().onClick.AddListener(() => {
+                fullScreenPanel.SetActive(false);
+                onCancel.Invoke();
+            });
+        }
+        
+        LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
 
-    // --- 1. 情報ボタン (男子から聞いた話) ---
+    // --- 以下、既存のメソッド ---
+    void ClearList()
+    {
+        foreach (Transform child in listContent) Destroy(child.gameObject);
+        detailPanel.SetActive(false); 
+    }
+
     public void OnInfoBtn()
     {
         ClearList();
         headerText.text = "【秘密の情報】";
-
         foreach (var f in gameManager.allFriends)
         {
-            // ヒントが公開されているキャラのみ表示
             if (f.isHintRevealed)
             {
                 CreateListButton(f.friendName, () =>
@@ -60,12 +97,10 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    // --- 2. 親友ボタン ---
     public void OnShinyuBtn()
     {
         ClearList();
         headerText.text = "【親友リスト】";
-
         foreach (var f in gameManager.allFriends)
         {
             if (f.isRecruited)
@@ -78,12 +113,10 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    // --- 3. 男友達ボタン ---
     public void OnMaleFriendBtn()
     {
         ClearList();
         headerText.text = "【男友達】";
-
         foreach (var m in gameManager.playerStats.maleFriendsList)
         {
             if (!m.isBoyfriend)
@@ -97,13 +130,11 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    // --- 4. 彼氏ボタン ---
     public void OnBoyfriendBtn()
     {
         ClearList();
         headerText.text = "【彼氏】";
-
-        foreach (var m in gameManager.playerStats.boyfriendList) // 修正: boyfriendListを参照
+        foreach (var m in gameManager.playerStats.boyfriendList) 
         {
             if (m.isBoyfriend)
             {
@@ -115,7 +146,6 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    // --- 5. アイテムボタン ---
     public void OnItemBtn()
     {
         RefreshItemList();
@@ -185,9 +215,6 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    // --- ヘルパーメソッド ---
-
-    // リストのボタンを生成する
     void CreateListButton(string label, UnityEngine.Events.UnityAction onClick)
     {
         GameObject btnObj = Instantiate(listButtonPrefab, listContent);
@@ -195,7 +222,6 @@ public class MenuManager : MonoBehaviour
         btnObj.GetComponent<Button>().onClick.AddListener(onClick);
     }
 
-    // 詳細パネルを表示する
     void ShowDetail(string title, string content, UnityEngine.Events.UnityAction action, string btnLabel = "使う")
     {
         detailPanel.SetActive(true);
@@ -220,38 +246,31 @@ public class MenuManager : MonoBehaviour
         detailPanel.SetActive(false);
     }
 
-    // --- ★追加: カード入手時の確認 (Confirmation) ---
     public void ShowCardConfirmation(int cardValue, UnityEngine.Events.UnityAction onOk)
     {
         fullScreenPanel.SetActive(true);
-
-        // 既存ボタン削除
         foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
 
         fullScreenTitle.text = "移動カード購入";
         fullScreenDesc.text = $"手に入れた数字は\n<size=200%><color=red>{cardValue}</color></size>\nです！";
 
-        // OKボタン生成
         GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
         btn.GetComponentInChildren<TextMeshProUGUI>().text = "OK";
         btn.GetComponent<Button>().onClick.AddListener(() =>
         {
-            fullScreenPanel.SetActive(false); // パネル閉じる
-            onOk.Invoke(); // 次の処理へ
+            fullScreenPanel.SetActive(false); 
+            onOk.Invoke(); 
         });
     }
 
-    // --- ★追加: カード取捨選択メニュー (全画面版を使用) ---
     public void OpenCardDiscardMenu(List<int> currentCards, int newCard, UnityEngine.Events.UnityAction<int> onDecision)
     {
         fullScreenPanel.SetActive(true);
-
         foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
 
         fullScreenTitle.text = "カード整理";
         fullScreenDesc.text = "手持ちがいっぱいです(5枚)。\n捨てるカードを1枚選んでください。\n(残すカードではありません)";
 
-        // 1. 手持ちカード (0~4)
         for (int i = 0; i < currentCards.Count; i++)
         {
             int cardVal = currentCards[i];
@@ -265,7 +284,6 @@ public class MenuManager : MonoBehaviour
             });
         }
 
-        // 2. 新規カード (5)
         int newIndex = currentCards.Count;
         GameObject newBtn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
         newBtn.GetComponentInChildren<TextMeshProUGUI>().text = $"新規[{newCard}] を諦める";
@@ -275,11 +293,9 @@ public class MenuManager : MonoBehaviour
             onDecision(newIndex);
         });
 
-        // レイアウト更新
         LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
 
-    // 親友効果の説明文用（簡易）
     string GetEffectDescription(FriendEffectType type)
     {
         switch (type)
@@ -290,5 +306,4 @@ public class MenuManager : MonoBehaviour
             default: return "特別な効果はありません。";
         }
     }
-
-} // ← クラスの終わりはここだけにする
+}

@@ -13,6 +13,15 @@ public class ItemManager : MonoBehaviour
     public const int MaxCards = 5;
     public List<ItemData> inventory = new List<ItemData>();
 
+    private void Start()
+    {
+        // ★修正: 自動取得を追加
+        if (menuManager == null) menuManager = FindObjectOfType<MenuManager>();
+        if (gameManager == null) gameManager = FindObjectOfType<GameManager>();
+        if (playerStats == null) playerStats = PlayerStats.Instance;
+        if (eventManager == null) eventManager = FindObjectOfType<EventManager>();
+    }
+
     public Dictionary<string, int> GetItemCounts()
     {
         Dictionary<string, int> counts = new Dictionary<string, int>();
@@ -41,6 +50,8 @@ public class ItemManager : MonoBehaviour
     public void BuyOrGetMoveCard()
     {
         int newCardValue = Random.Range(1, 7);
+        // 安全策
+        if (menuManager == null) menuManager = FindObjectOfType<MenuManager>();
         menuManager.ShowCardConfirmation(newCardValue, () => CheckCardLimit(newCardValue));
     }
 
@@ -80,44 +91,40 @@ public class ItemManager : MonoBehaviour
         {
             playerStats.moveCards.Remove(cardValue);
             Debug.Log($"移動カード {cardValue} を使用");
-            menuManager.CloseDetail();
+            if (menuManager) menuManager.CloseDetail();
             if (gameManager != null) gameManager.StartCoroutine(gameManager.MovePlayer(cardValue));
         }
     }
 
-    // ★修正: アイテム使用処理（イベント強制に対応）
     public void UseItemByName(string itemName)
     {
         bool used = false;
-
-        // 1. インベントリ内のアイテム
         var item = inventory.FirstOrDefault(x => x.itemName == itemName);
         if (item != null)
         {
-            // ここに通常アイテムの効果分岐を書く
-            // ...
             inventory.Remove(item);
             used = true;
         }
 
-        // 2. 特殊パラメータアイテム (イベント強制など)
         if (!used)
         {
-            if (itemName == "イベント強制" && playerStats.eventForce > 0)
+            if (itemName == "イベント強制")
             {
-                playerStats.eventForce--;
-                gameManager.TriggerEventTileFromItem();
-                used = true;
+                if (playerStats.eventForce > 0)
+                {
+                    playerStats.eventForce--;
+                    Debug.Log("イベント強制アイテムを使用しました。");
+                    if (gameManager) gameManager.TriggerEventTileFromItem();
+                    used = true;
+                }
             }
         }
 
         if (used)
         {
-            Debug.Log($"{itemName} を使用しました");
             if (menuManager) menuManager.CloseDetail();
-            // PhoneUIも閉じる場合はここに記述
             var phoneUI = FindObjectOfType<PhoneUIManager>();
-            if (phoneUI) phoneUI.itemPanel.SetActive(false);
+            if (phoneUI && phoneUI.itemPanel.activeSelf) phoneUI.itemPanel.SetActive(false);
         }
     }
 }

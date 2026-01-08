@@ -12,6 +12,7 @@ public class GameManager : MonoBehaviour
     public BoardManager boardManager;
     public ShopManager shopManager;
     public EventManager eventManager;
+    public MenuManager menuManager;
     public BoyfriendManager boyfriendManager; // ★Inspectorでアタッチする！
 
     [Header("--- Game Settings ---")]
@@ -347,66 +348,48 @@ public class GameManager : MonoBehaviour
     // ---------------------------------------------------------
     // ★変更点2: 教室マスの処理 (確認フェーズの実装)
     // ---------------------------------------------------------
+    // --- ★修正: 教室ロジック (FullScreenPanel使用) ---
     void HandleClassroomTile(int tileIndex)
     {
-        // 1. このマスに対応する部屋名を特定
+        // 1. その教室に割り振られている親友を特定
         int roomIndex = tileIndex % floor2Rooms.Count;
         string roomName = floor2Rooms[roomIndex];
-
-        // 2. その部屋にいる未加入の親友を探す
         var target = allFriends.FirstOrDefault(f => f.assignedRoom == roomName && !f.isRecruited);
 
-        // 3. メッセージ作成
-        string message = $"【{roomName}】の前に来ました。";
-        string yesButton = "中に入る";
+        bool hasHandbook = (playerStats.studentIdCount > 0);
 
-        if (playerStats.studentIdCount > 0)
+        // 2. MenuManagerの全画面パネルを使って分岐表示
+        // 引数: 手帳があるか, 調査する時のAction, やめる時のAction
+        if (menuManager != null)
         {
-            // 手帳があればヒント表示
-            if (target != null)
-                message += $"\n(生徒手帳: {target.friendName} がいる気配がします！)";
-            else
-                message += "\n(生徒手帳: 特に誰もいないようです)";
+            menuManager.ShowClassroomPanel(hasHandbook,
+                () => HandleClassroomChallenge(target), // 調査
+                EndTurn // やめる -> ターン終了
+            );
         }
         else
         {
-            message += "\n(中の様子は分かりません……)";
+            // MenuManagerがない場合のフォールバック（ログのみ）
+            Debug.LogError("MenuManager is not assigned!");
+            EndTurn();
         }
-
-        // 4. 選択肢を表示 (確認フェーズ)
-        eventManager.ShowOptions(
-            "教室イベント",
-            message,
-            yesButton,      // 選択肢1
-            "通り過ぎる",    // 選択肢2
-            null,
-            () => HandleClassroomChallenge(target), // 1を選んだらチャレンジ
-            EndTurn,                                // 2を選んだら終了
-            null
-        );
     }
 
-    // ---------------------------------------------------------
-    // ★変更点3: 教室での探索実行 (出現ロジックの修正)
-    // ---------------------------------------------------------
+    // 調査実行
     void HandleClassroomChallenge(FriendData target)
     {
-        // ターゲットが不在なら失敗
-        if (target == null)
+        // ターゲットが設定されている部屋なら成功
+        if (target != null)
         {
-            if (phoneUI) phoneUI.AddLog("教室には誰もいなかった……。");
-            EndTurn();
-            return;
+            target.isRecruited = true;
+            target.isHintRevealed = true;
+            eventManager.ShowMessage($"【成功】\n教室で {target.friendName} を見つけました！\n親友になりました。", EndTurn);
         }
-
-        // ターゲットがいれば確定で成功（ゲームバランスにより確率にしてもOK）
-        target.isRecruited = true;
-        target.isHintRevealed = true;
-
-        eventManager.ShowMessage(
-            $"【出会い】\n教室で {target.friendName} を見つけました！\nこれからよろしくね！",
-            EndTurn
-        );
+        else
+        {
+            if (phoneUI) phoneUI.AddLog("教室には誰もいなかったようだ……。");
+            EndTurn();
+        }
     }
     void HandleEventTile()
     {
@@ -723,6 +706,7 @@ public class GameManager : MonoBehaviour
         // 5. 日付更新
         playerStats.currentTurn++;
         playerStats.currentMonth++;
+        hasRerolledThisTurn = false; // ★修正: ここでフラグをリセット！
         if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
 
         // 6. UI更新と操作許可

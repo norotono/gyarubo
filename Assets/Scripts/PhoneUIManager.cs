@@ -68,8 +68,6 @@ public class PhoneUIManager : MonoBehaviour
         }
     }
 
-    // --- メニュー表示 ---
-
     public void OnItemBtn()
     {
         RefreshItemList();
@@ -77,17 +75,15 @@ public class PhoneUIManager : MonoBehaviour
 
     public void RefreshItemList()
     {
-        // パネル表示
         if (diceArea) diceArea.SetActive(false);
         if (dialogScroll) dialogScroll.SetActive(false);
         if (itemPanel) itemPanel.SetActive(true);
 
-        // リストクリア
         foreach (Transform child in itemListRoot) Destroy(child.gameObject);
 
-        // 1. ItemManager経由で移動カードなどを取得・表示
-        // (ItemManagerが参照できる前提。GameManager等から参照取得してください)
-        var itemManager = FindObjectOfType<ItemManager>(); // 簡易的に取得
+        // ★修正: ItemManagerを安全に取得
+        var itemManager = FindObjectOfType<ItemManager>();
+
         if (itemManager != null)
         {
             // A. 移動カード
@@ -100,64 +96,64 @@ public class PhoneUIManager : MonoBehaviour
                 {
                     CreateItemButton($"移動カード [{num}]  x{count}", () =>
                     {
-                        itemManager.menuManager.CloseDetail();
-                        itemManager.menuManager.detailPanel.SetActive(true);
-                        itemManager.menuManager.detailTitle.text = $"移動カード [{num}]";
-                        itemManager.menuManager.detailDesc.text = "このカードを使って移動しますか？";
-                        itemManager.menuManager.actionButton.gameObject.SetActive(true);
-                        itemManager.menuManager.actionBtnText.text = "使う";
-                        itemManager.menuManager.actionButton.onClick.RemoveAllListeners();
-                        itemManager.menuManager.actionButton.onClick.AddListener(() => itemManager.UseMovementCard(num));
+                        // MenuManager経由で表示
+                        // 安全のためMenuManagerも探す
+                        var menuMgr = itemManager.menuManager;
+                        if (menuMgr == null) menuMgr = FindObjectOfType<MenuManager>();
+
+                        if (menuMgr)
+                        {
+                            menuMgr.CloseDetail();
+                            menuMgr.detailPanel.SetActive(true);
+                            menuMgr.detailTitle.text = $"移動カード [{num}]";
+                            menuMgr.detailDesc.text = "このカードを使って移動しますか？";
+                            menuMgr.actionButton.gameObject.SetActive(true);
+                            menuMgr.actionBtnText.text = "使う";
+                            menuMgr.actionButton.onClick.RemoveAllListeners();
+                            menuMgr.actionButton.onClick.AddListener(() => itemManager.UseMovementCard(num));
+                        }
                     });
                 }
             }
 
-            // B. 通常アイテム (ItemManagerのInventoryリスト)
+            // B. 通常アイテム
             var invCounts = itemManager.GetItemCounts();
             foreach (var kvp in invCounts)
             {
                 string iName = kvp.Key;
                 int count = kvp.Value;
-                CreateItemButton($"{iName}  x{count}", () =>
-                {
-                    ShowItemDetail(itemManager, iName);
-                });
+                CreateItemButton($"{iName}  x{count}", () => ShowItemDetail(itemManager, iName));
             }
         }
 
-        // C. 特殊アイテム (PlayerStatsのint変数で管理されているもの)
-
-        // 生徒手帳 (確認のみ)
-        if (playerStats.studentIdCount > 0)
-        {
-            CreateItemButton($"生徒手帳  x{playerStats.studentIdCount}", () =>
-            {
-                ShowGenericDetail("生徒手帳", "【効果】\n教室マスに止まった際、クラスの様子を確認したり、特定の行動を選択できるようになります。\n(※この画面では使用できません。教室マスで自動的に効果を発揮します)", null);
-            });
-        }
-
-        // イベント強制 (使用可能)
+        // C. 特殊アイテム
         if (playerStats.eventForce > 0)
         {
             CreateItemButton($"イベント強制  x{playerStats.eventForce}", () =>
             {
-                ShowGenericDetail("イベント強制", "【効果】\n今いるマスで強制的にイベントを発生させます。\n使用しますか？", () =>
+                ShowGenericDetail("イベント強制", "現在のマスで強制的にイベントを発生させます。\n使用しますか？", () =>
                 {
-                    if (itemManager != null) itemManager.UseItemByName("イベント強制");
+                    if (itemManager) itemManager.UseItemByName("イベント強制");
                 });
             });
         }
 
-        // プレゼント (使用不可・ショップ用)
+        if (playerStats.studentIdCount > 0)
+        {
+            CreateItemButton($"生徒手帳  x{playerStats.studentIdCount}", () =>
+            {
+                ShowGenericDetail("生徒手帳", "【効果】\n教室マスで親友を探せるようになります。\n(※所持しているだけで効果があります)", null);
+            });
+        }
+
         if (playerStats.present > 0)
         {
             CreateItemButton($"プレゼント  x{playerStats.present}", () =>
             {
-                ShowGenericDetail("プレゼント", "【効果】\n誰かにあげると親密度が上がります。\n(※特定のイベントで使用します)", null);
+                ShowGenericDetail("プレゼント", "【効果】\n特定のイベントで男友達に渡すと親密度が上がります。", null);
             });
         }
 
-        // 閉じるボタン
         CreateItemButton("閉じる", () =>
         {
             itemPanel.SetActive(false);
@@ -167,6 +163,7 @@ public class PhoneUIManager : MonoBehaviour
 
     void CreateItemButton(string label, UnityEngine.Events.UnityAction onClick)
     {
+        if (itemButtonPrefab == null) return;
         GameObject btn = Instantiate(itemButtonPrefab, itemListRoot);
         btn.GetComponentInChildren<TextMeshProUGUI>().text = label;
         btn.GetComponent<Button>().onClick.AddListener(onClick);
@@ -174,24 +171,21 @@ public class PhoneUIManager : MonoBehaviour
 
     void ShowItemDetail(ItemManager mgr, string itemName)
     {
-        // ItemManager経由での詳細表示ロジックがあればそれを呼ぶ
-        // ここでは簡易的にMenuManagerのUIを借用
-        if (mgr.menuManager != null)
+        var menuMgr = FindObjectOfType<MenuManager>();
+        if (menuMgr != null)
         {
-            mgr.menuManager.detailPanel.SetActive(true);
-            mgr.menuManager.detailTitle.text = itemName;
-            mgr.menuManager.detailDesc.text = "このアイテムを使用しますか？";
-            mgr.menuManager.actionButton.gameObject.SetActive(true);
-            mgr.menuManager.actionBtnText.text = "使う";
-            mgr.menuManager.actionButton.onClick.RemoveAllListeners();
-            mgr.menuManager.actionButton.onClick.AddListener(() => mgr.UseItemByName(itemName));
+            menuMgr.detailPanel.SetActive(true);
+            menuMgr.detailTitle.text = itemName;
+            menuMgr.detailDesc.text = "このアイテムを使用しますか？";
+            menuMgr.actionButton.gameObject.SetActive(true);
+            menuMgr.actionBtnText.text = "使う";
+            menuMgr.actionButton.onClick.RemoveAllListeners();
+            menuMgr.actionButton.onClick.AddListener(() => mgr.UseItemByName(itemName));
         }
     }
 
-    // 汎用詳細表示
     void ShowGenericDetail(string title, string desc, UnityEngine.Events.UnityAction onUse)
     {
-        // MenuManagerのUIを探して使う（無ければログ）
         var menuMgr = FindObjectOfType<MenuManager>();
         if (menuMgr != null)
         {
@@ -215,6 +209,14 @@ public class PhoneUIManager : MonoBehaviour
                 menuMgr.actionButton.gameObject.SetActive(false);
             }
         }
+    }
+
+    public void ShowDiceMode()
+    {
+        if (diceArea) diceArea.SetActive(true);
+        if (dialogScroll) dialogScroll.SetActive(false);
+        if (itemPanel) itemPanel.SetActive(false);
+        if (menuArea) menuArea.SetActive(true);
     }
 
     public void ShowDialogMode(string message)
