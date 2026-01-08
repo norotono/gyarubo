@@ -344,71 +344,70 @@ public class GameManager : MonoBehaviour
         EndTurn();
     }
 
-    // ★追加: 教室での親友チャレンジ処理
-    void HandleClassroomChallenge(int tileIndex)
+    // ---------------------------------------------------------
+    // ★変更点2: 教室マスの処理 (確認フェーズの実装)
+    // ---------------------------------------------------------
+    void HandleClassroomTile(int tileIndex)
     {
-        Debug.Log($"教室(Tile:{tileIndex})で親友を探します。");
+        // 1. このマスに対応する部屋名を特定
+        int roomIndex = tileIndex % floor2Rooms.Count;
+        string roomName = floor2Rooms[roomIndex];
 
-        // 簡易的に50%で発見
-        bool isSuccess = (Random.value < 0.5f); 
+        // 2. その部屋にいる未加入の親友を探す
+        var target = allFriends.FirstOrDefault(f => f.assignedRoom == roomName && !f.isRecruited);
 
-        if (isSuccess)
+        // 3. メッセージ作成
+        string message = $"【{roomName}】の前に来ました。";
+        string yesButton = "中に入る";
+
+        if (playerStats.studentIdCount > 0)
         {
-            // まだ仲間にしていない、かつ教室条件の親友をランダムに1人選ぶ
-            var target = allFriends.FirstOrDefault(f =>
-                !f.isRecruited && f.assignedCondition == ConditionType.Classroom);
-
+            // 手帳があればヒント表示
             if (target != null)
-            {
-                target.isRecruited = true;
-                target.isHintRevealed = true;
-                eventManager.ShowMessage($"【成功】\n教室で {target.friendName} を見つけました！\n仲間に誘いました。", EndTurn);
-            }
+                message += $"\n(生徒手帳: {target.friendName} がいる気配がします！)";
             else
-            {
-                eventManager.ShowMessage("教室に誰かいる気配がしましたが、\n既に全員仲間のようです。", EndTurn);
-            }
+                message += "\n(生徒手帳: 特に誰もいないようです)";
         }
         else
         {
-            eventManager.ShowMessage("教室には誰もいないようです……。", EndTurn);
+            message += "\n(中の様子は分かりません……)";
         }
+
+        // 4. 選択肢を表示 (確認フェーズ)
+        eventManager.ShowOptions(
+            "教室イベント",
+            message,
+            yesButton,      // 選択肢1
+            "通り過ぎる",    // 選択肢2
+            null,
+            () => HandleClassroomChallenge(target), // 1を選んだらチャレンジ
+            EndTurn,                                // 2を選んだら終了
+            null
+        );
     }
 
-    // 【修正】教室マスの処理（選択肢を2つに限定）
-    void HandleClassroomTile(int index)
+    // ---------------------------------------------------------
+    // ★変更点3: 教室での探索実行 (出現ロジックの修正)
+    // ---------------------------------------------------------
+    void HandleClassroomChallenge(FriendData target)
     {
-        // 生徒手帳が有効なら選択肢を出す
-        if (isHandbookActive)
+        // ターゲットが不在なら失敗
+        if (target == null)
         {
-            eventManager.ShowOptions(
-                "生徒手帳の効果",
-                "教室の様子が分かります。\nどうしますか？",
-
-                // ボタン1
-                "親友を探す",
-                // ボタン2
-                "何もしない",
-                // ボタン3 (なし)
-                null,
-
-                // ボタン1の処理: チャレンジ実行
-                () => HandleClassroomChallenge(index),
-
-                // ボタン2の処理: 何もしないでターン終了
-                EndTurn,
-
-                // ボタン3の処理: なし
-                null
-            );
+            if (phoneUI) phoneUI.AddLog("教室には誰もいなかった……。");
+            EndTurn();
+            return;
         }
-        else
-        {
-            // 生徒手帳がない通常時は、強制的にチャレンジ（またはランダムイベント）へ
-            HandleClassroomChallenge(index);
-        }
+
+        // ターゲットがいれば確定で成功（ゲームバランスにより確率にしてもOK）
+        target.isRecruited = true;
+        target.isHintRevealed = true;
+
+        eventManager.ShowMessage(
+            $"【出会い】\n教室で {target.friendName} を見つけました！\nこれからよろしくね！",
+            EndTurn
+        );
     }
-
     void HandleEventTile()
     {
         // ★修正: ドット抜け修正 (playerStats.MaleFriendCount)
