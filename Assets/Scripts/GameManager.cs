@@ -39,6 +39,7 @@ public class GameManager : MonoBehaviour
     private int currentTileIndex = 0;
     private bool isMoving = false;
     private bool hasRerolledThisTurn = false;
+
     // ★追加: アイテム管理と生徒手帳フラグ
     public ItemManager itemManager;
     public bool isHandbookActive = false;
@@ -46,37 +47,48 @@ public class GameManager : MonoBehaviour
 
     private int middleTileIndex = 24;
 
-
-    // ★追加: GP獲得処理 (ギャル力ボーナス適用)
-    // 既存の HandleBlueTile などで gp += ... としている部分をこれに置き換えてください
+    // --- ★修正: GP獲得処理 (統合版) ---
+    // 重複していた AddGP をここに統合しました
     public void AddGP(int amount)
     {
+        // 1. ミレイの能力 (GP獲得1.5倍)
+        if (HasFriendEffect(FriendEffectType.GPMultiplier))
+        {
+            amount = (int)(amount * 1.5f);
+        }
+
+        // 2. ステータス補正（ギャル力）
         int bonus = playerStats.GetGalGpBonus();
         int total = amount + bonus;
+
         playerStats.gp += total;
 
-        // ログ出力例 (AddLogなどがある場合)
+        // ログ出力
         Debug.Log($"GPを {total} (基本{amount} + ギャル{bonus}) 獲得しました。");
-        if (phoneUI) phoneUI.UpdateStatusUI(); // UI更新があれば呼ぶ
+        if (phoneUI) phoneUI.UpdateStatusUI();
     }
 
-    // ★追加: 友達獲得処理 (コミュ力ボーナス適用)
+    // --- ★修正: 友達獲得処理 (統合版) ---
+    // AddFriend と AddFriends が混在していたのをここに統合
     public void AddFriends(int count)
     {
+        // ステータス補正（コミュ力）
         int bonus = playerStats.GetCommuFriendBonus();
         int total = count + bonus;
+
         playerStats.friends += total;
 
         Debug.Log($"友達が {total}人 (基本{count} + コミュ{bonus}) 増えました。");
         if (phoneUI) phoneUI.UpdateStatusUI();
     }
+
     private void Start()
     {
         if (playerStats == null) playerStats = PlayerStats.Instance;
         isHandbookActive = false;
         // 1. 友達データの初期化
         InitializeFriends();
-        hasRerolledThisTurn = false; // ★この行を追加
+        hasRerolledThisTurn = false;
         // ★追加: 最初はダイス画像を消しておく
         if (diceImage != null) diceImage.gameObject.SetActive(false);
 
@@ -217,7 +229,6 @@ public class GameManager : MonoBehaviour
             UpdateMainUI();
 
             // 通過時の購買チェック
-            // 通過時の購買チェック
             if (boardManager.BoardLayout[currentTileIndex] == "Shop" && i < steps - 1)
             {
                 AddLog("購買部を通過します。");
@@ -272,10 +283,8 @@ public class GameManager : MonoBehaviour
                 return;
 
             case "GPPlus":
-                int gVal = (currentGrade * 150 + playerStats.galLv * 100) * mult;
-                // ★追加: ミレイの能力 (GP獲得1.5倍)
-                if (HasFriendEffect(FriendEffectType.GPMultiplier)) gVal = (int)(gVal * 1.5f);
-
+                int gVal = (currentGrade * 150) * mult;
+                // AddGP内でギャル力ボーナスとミレイ効果(1.5倍)が適用される
                 AddGP(gVal);
                 playerStats.gpIncreaseTileCount++;
                 break;
@@ -285,7 +294,6 @@ public class GameManager : MonoBehaviour
                 if (HasFriendEffect(FriendEffectType.BadEventToGP))
                 {
                     int bonus = 100 * mult;
-                    if (HasFriendEffect(FriendEffectType.GPMultiplier)) bonus = (int)(bonus * 1.5f);
                     AddGP(bonus);
                     AddLog("ノアの能力: GP減少を回避して逆に獲得！");
                     break;
@@ -303,8 +311,8 @@ public class GameManager : MonoBehaviour
                 break;
 
             case "FriendPlus":
-                int fVal = (currentGrade * 1 + playerStats.commuLv) * mult;
-                AddFriend(fVal);
+                int fVal = (currentGrade * 1) * mult;
+                AddFriends(fVal); // 修正: AddFriendsを使用
                 break;
 
             case "FriendMinus":
@@ -312,7 +320,6 @@ public class GameManager : MonoBehaviour
                 if (HasFriendEffect(FriendEffectType.BadEventToGP))
                 {
                     int bonus = 100 * mult;
-                    if (HasFriendEffect(FriendEffectType.GPMultiplier)) bonus = (int)(bonus * 1.5f);
                     AddGP(bonus);
                     AddLog("ノアの能力: 友達減少を回避してGPを獲得！");
                     break;
@@ -336,21 +343,14 @@ public class GameManager : MonoBehaviour
         yield return StartCoroutine(shopManager.OpenShopSequence(playerStats, discount));
         EndTurn();
     }
-    // GameManager.cs クラス内に以下のメソッドを追加してください
-
-
 
     // ★追加: 教室での親友チャレンジ処理
     void HandleClassroomChallenge(int tileIndex)
     {
         Debug.Log($"教室(Tile:{tileIndex})で親友を探します。");
 
-        // 1. この教室に割り当てられている親友を探す
-        // (assignedRoom の判定は文字列比較など実装に合わせて調整してください。ここでは簡易的に探します)
-
-        // とりあえずランダムな確率で発見する処理（仮実装）
-        // ※本来は tileIndex に対応する部屋名 ("2-A"など) と f.assignedRoom を比較します
-        bool isSuccess = (Random.value < 0.5f); // 50%で発見
+        // 簡易的に50%で発見
+        bool isSuccess = (Random.value < 0.5f);
 
         if (isSuccess)
         {
@@ -411,8 +411,8 @@ public class GameManager : MonoBehaviour
 
     void HandleEventTile()
     {
-        // 男友達（彼氏含む）がいるか確認
-        bool hasBoys = playerStatsMaleFriendCount > 0;
+        // ★修正: ドット抜け修正 (playerStats.MaleFriendCount)
+        bool hasBoys = playerStats.MaleFriendCount > 0;
 
         if (hasBoys)
         {
@@ -450,7 +450,7 @@ public class GameManager : MonoBehaviour
         playerStats.soloPlayConsecutive = 0; // ぼっち連鎖リセット
 
         // 親密度上昇 (+レモン力補正)
-        float baseAffection = 20f + (playerStats.lemonLv * 5);
+        float baseAffection = 20f + (playerStats.GetEffectiveLemonLv() * 5); // 修正: GetEffectiveLemonLv使用推奨だが、元の記述があればそれでも可
         string result = boyfriendManager.IncreaseAffection(baseAffection);
         AddLog($"お出かけしました。\n{result}");
 
@@ -458,7 +458,7 @@ public class GameManager : MonoBehaviour
         if (HasFriendEffect(FriendEffectType.MobFriendPromote))
         {
             AddLog("マキの能力: 確実に親友(モブ)へ昇格させます！");
-            AddFriend(1);
+            AddFriends(1); // 修正: AddFriends
         }
         else
         {
@@ -466,7 +466,7 @@ public class GameManager : MonoBehaviour
             if (Random.Range(0, 100) < 10)
             {
                 AddLog("なんと！ 友達が親友(モブ)に昇格しました！");
-                AddFriend(1);
+                AddFriends(1); // 修正: AddFriends
             }
         }
 
@@ -475,8 +475,6 @@ public class GameManager : MonoBehaviour
     }
 
     // 一人で遊ぶ時の判定（親友 -> ランダム）
-    // 【変更】一人で遊ぶ（ルーレット演出付き）
-    // 【修正】GameManager.cs の CheckSoloEvent メソッド
     void CheckSoloEvent()
     {
         // 1. 特殊条件親友の出現チェック
@@ -491,87 +489,12 @@ public class GameManager : MonoBehaviour
         // 2. 該当者がいなければルーレット演出へ
         bool hasProtection = HasFriendEffect(FriendEffectType.NullifyGPMinus) || HasFriendEffect(FriendEffectType.BadEventToGP);
 
-        // ★エラー修正: PlayRouletteSequence に名前を変更し、引数を合わせる
+        // ルーレット実行
         StartCoroutine(eventManager.PlayRouletteSequence(playerStats, currentGrade, hasProtection, EndTurn));
     }
 
-    // 【追加】ルーレット演出のコルーチン
-    IEnumerator PlayRouletteSequence()
-    {
-        AddLog("今日は何をしようかな……？");
-        isMoving = true; // 操作ブロック
-
-        // ルーレットの候補テキスト
-        string[] candidates = {
-            "新しい友達ができるかも？",
-            "臨時収入の予感！",
-            "無駄遣いしちゃうかも…",
-            "友達と喧嘩しちゃうかも…",
-            "勉強してステータスUP！"
-        };
-
-        // 演出：テキストをパラパラ切り替える（ログまたは専用パネル）
-        // ※ここでは簡易的にLogを更新する演出とします
-        float duration = 2.0f;
-        float timer = 0f;
-        float interval = 0.1f;
-
-        while (timer < duration)
-        {
-            // ランダムに候補を表示（実際は専用のUI Textを更新するのが望ましいですが、ここではログウィンドウで表現）
-            // もし専用の「結果表示テキスト」があるなら、statusText.text = candidates[...] 等を使用してください
-            int randomIndex = Random.Range(0, candidates.Length);
-            // statusText.text = $"ルーレット中... {candidates[randomIndex]}"; // もし使うなら
-
-            yield return new WaitForSeconds(interval);
-            timer += interval;
-            // 徐々に遅くする演出
-            interval *= 1.1f;
-        }
-
-        // 結果確定
-        int roll = Random.Range(0, 100);
-        string resultMsg = "";
-
-        if (roll < 30) // 0-29: 友達+
-        {
-            int val = currentGrade * 1 + playerStats.commuLv;
-            AddFriend(val);
-            resultMsg = "新しい友達ができた！";
-        }
-        else if (roll < 55) // 30-54: GP+
-        {
-            int gain = currentGrade * 150 + playerStats.galLv * 100;
-            AddGP(gain);
-            resultMsg = $"臨時収入！ GP+{gain}";
-        }
-        else if (roll < 80) // 55-79: GP-
-        {
-            int loss = currentGrade * 100;
-            if (HasFriendEffect(FriendEffectType.NullifyGPMinus)) loss = 0;
-            playerStats.gp = Mathf.Max(0, playerStats.gp - loss);
-            resultMsg = $"無駄遣いしてしまった…… GP-{loss}";
-        }
-        else if (roll < 95) // 80-94: 友達-
-        {
-            if (playerStats.friends > 0) playerStats.friends--;
-            resultMsg = "友達と喧嘩してしまった…… 友達-1";
-        }
-        else // 95-99: ステータスUP
-        {
-            // ランダムにステータスアップ
-            int type = Random.Range(0, 3);
-            if (type == 0) { playerStats.commuLv++; resultMsg = "勉強してコミュ力が上がった！"; }
-            else if (type == 1) { playerStats.galLv++; resultMsg = "メイクの研究をしてギャル力が上がった！"; }
-            else { playerStats.lemonLv++; resultMsg = "恋バナをしてレモン力が上がった！"; }
-        }
-
-        AddLog($"結果: {resultMsg}");
-
-        yield return new WaitForSeconds(1.0f);
-        isMoving = false;
-        EndTurn();
-    }
+    // ※PlayRouletteSequence は EventManager に移動されている前提のため、ここでは削除するかコメントアウト
+    // もしGameManager内に残す必要があるなら元のコードを復活させてください
 
     void HandleMaleTile()
     {
@@ -596,7 +519,7 @@ public class GameManager : MonoBehaviour
                 AddLog($"【情報】\n{hint}");
 
                 AddGP(500);
-                AddFriend(2);
+                AddFriends(2); // 修正: AddFriends
                 AddLog("情報を入手した報酬: GP+500, 友達+2");
             }
             else
@@ -646,7 +569,7 @@ public class GameManager : MonoBehaviour
             // 選択肢2: 親密度アップ（全員）
             "男子全員の親密度 +40",
 
-            // 選択肢3: 友達ゲット（モブ昇格廃止 -> 友達+10）
+            // 選択肢3: 友達ゲット
             "友達 +10人",
 
             // Action 1
@@ -672,29 +595,17 @@ public class GameManager : MonoBehaviour
             // Action 3
             () =>
             {
-                AddFriends(10);
+                AddFriends(10); // 修正: AddFriends
                 Debug.Log("友達 +10人");
                 EndTurn();
             }
         );
     }
 
-    // 【修正】古い呼び出し方になっていた部分を修正
-    IEnumerator RunRoulette()
-    {
-        bool protection = HasFriendEffect(FriendEffectType.BadEventToGP);
-
-        // エラー原因: 引数が足りていませんでした。
-        // 修正: (stats, grade, protection, callback) の4つを渡すように変更
-        yield return StartCoroutine(eventManager.PlayRouletteSequence(playerStats, currentGrade, protection, null));
-
-        EndTurn();
-    }
-
     // --- ターン終了・補助 ---
 
     // 【修正】ターン終了処理（完全版）
-    void EndTurn()
+    public void EndTurn() // public にしておくと外部からも呼びやすい
     {
         // 既存の処理をいきなり行わず、まず親友出現チェックを開始
         StartCoroutine(EndTurnSequence());
@@ -704,18 +615,17 @@ public class GameManager : MonoBehaviour
     IEnumerator EndTurnSequence()
     {
         // まだ仲間になっていない親友を順番にチェック
-        // ※コレクション変更エラーを防ぐため ToList() でコピーして回す
         var potentialFriends = allFriends.Where(f => !f.isRecruited).ToList();
 
         foreach (var f in potentialFriends)
         {
             bool isMet = false;
 
-            // --- 条件判定ロジック (簡易実装) ---
+            // --- 条件判定ロジック ---
             switch (f.assignedCondition)
             {
                 case ConditionType.Happiness:
-                    if (playerStats.happiness >= 50) isMet = true; // 数値は調整してください
+                    if (playerStats.happiness >= 50) isMet = true;
                     break;
                 case ConditionType.Rich:
                     if (playerStats.gp >= 5000) isMet = true;
@@ -724,13 +634,30 @@ public class GameManager : MonoBehaviour
                     if (playerStats.friends >= 100) isMet = true;
                     break;
                 case ConditionType.Steps:
-                    // 例: 10ターン経過など
-                    if (playerStats.currentTurn >= 10) isMet = true;
+                    // 例: 80歩以上
+                    if (playerStats.totalSteps >= 80) isMet = true;
                     break;
                 case ConditionType.Conversation:
-                    // 会話条件はイベントマスなどでフラグ管理が必要ですが、一旦仮で
+                    if (playerStats.maleContactCount >= 4) isMet = true;
                     break;
-                    // 必要に応じて他のcaseを追加
+                case ConditionType.Unhappiness:
+                    if (playerStats.gpDecreaseTileCount >= 3) isMet = true;
+                    break;
+                case ConditionType.DiceOne:
+                    if (playerStats.diceOneCount >= 3) isMet = true;
+                    break;
+                case ConditionType.Wasteful:
+                    if (playerStats.shopSpentTotal >= 4000) isMet = true;
+                    break;
+                case ConditionType.Solitude:
+                    if (playerStats.soloPlayConsecutive >= 3) isMet = true;
+                    break;
+                case ConditionType.StatusAll2:
+                    if (playerStats.IsAllStatsOver(2)) isMet = true;
+                    break;
+                case ConditionType.Ai_Fixed:
+                    if (playerStats.maleContactCount >= 8 || playerStats.gp >= 5000) isMet = true;
+                    break;
             }
 
             // --- 条件達成時の処理 ---
@@ -741,14 +668,13 @@ public class GameManager : MonoBehaviour
                 f.isHintRevealed = true; // 出会ったのでヒントも公開
 
                 // 登場ダイアログを表示
-                // (EventManagerのメソッド名はご自身の環境に合わせてください)
                 eventManager.ShowChoicePanel(
                     $"【親友登場！】\n{f.friendName} が現れた！\n(条件: {f.assignedCondition} 達成)",
                     new string[] { "仲間にする" },
                     new UnityEngine.Events.UnityAction[] { () => processed = true }
                 );
 
-                // プレイヤーがボタンを押すまで待機 (ここが重要)
+                // プレイヤーがボタンを押すまで待機
                 yield return new WaitUntil(() => processed);
             }
         }
@@ -757,39 +683,37 @@ public class GameManager : MonoBehaviour
         FinalizeTurn();
     }
 
-    // 3. 【移動】元々のEndTurnの中身 (名前をFinalizeTurnに変更)
+    // 3. 【移動】元々のEndTurnの中身
     void FinalizeTurn()
     {
         Debug.Log("ターン終了処理実行");
 
-        // --- 以下、頂いたコードそのまま ---
-
-        // 1. 給料計算 (null安全化)
+        // 1. 給料計算
         int shinyu = 0;
         if (allFriends != null)
         {
             shinyu = allFriends.Count(f => f != null && f.isRecruited);
         }
+        // 給料獲得時もステータス補正を乗せたい場合は AddGP を使う
         AddGP(playerStats.CalculateSalary(shinyu));
 
         // 2. レナの能力 (友達+1)
         if (HasFriendEffect(FriendEffectType.AutoFriend))
         {
-            AddFriends(1); // AddFriendメソッドがなければ直接加算
+            AddFriends(1);
         }
 
-        // 3. 彼氏の能力発動 (null安全化)
+        // 3. 彼氏の能力発動
         if (boyfriendManager != null)
         {
-            string bfLog = boyfriendManager.ActivateBoyfriendEffects();
-            // ログ出力メソッドが AddLog ならそのまま、なければ Debug.Log や ShowMessage に
+            // 名前を修正: ActivateTurnEndAbilities
+            string bfLog = boyfriendManager.ActivateTurnEndAbilities();
             if (!string.IsNullOrEmpty(bfLog)) Debug.Log(bfLog);
         }
 
         // 4. リカの能力 (カード生成)
         if (HasFriendEffect(FriendEffectType.CardGeneration) && playerStats.currentTurn % 12 == 0)
         {
-            // ※もしItemManagerを導入済みなら itemManager.movementCards を参照するように書き換えてください
             if (playerStats.moveCards.Count < 5)
             {
                 playerStats.moveCards.Add(Random.Range(1, 7));
@@ -803,13 +727,8 @@ public class GameManager : MonoBehaviour
         if (playerStats.currentMonth > 12) playerStats.currentMonth -= 12;
 
         // 6. UI更新と操作許可
-        // UpdateMainUI(); // メソッドがあれば
-        // isMoving = false; // フラグがあれば
-
         if (diceButton != null) diceButton.interactable = true;
-
-        // 最後に次のターンの準備（必要なら）
-        // StartTurn(); 
+        if (phoneUI) phoneUI.UpdateStatusUI();
     }
 
     void UpdateMainUI()
@@ -827,10 +746,10 @@ public class GameManager : MonoBehaviour
     }
 
     // --- 補助メソッド ---
+
+    // ★重複していた AddGP と AddFriend は上部に統合・削除しました。
     void AddLog(string msg) { Debug.Log(msg); if (phoneUI) phoneUI.AddLog(msg); }
-    void AddGP(int v) { if (HasFriendEffect(FriendEffectType.GPMultiplier)) v = (int)(v * 1.5f); playerStats.gp += v; }
-    void AddFriend(int v) { playerStats.friends += v; }
-    // 【追加】親友加入処理
+
     void RecruitFriend(FriendData f)
     {
         if (f.isRecruited) return;
@@ -846,21 +765,12 @@ public class GameManager : MonoBehaviour
             UpdateMainUI();
         }
     }
+
     public bool HasFriendEffect(FriendEffectType t)
     {
-        // allFriends自体がnullでないか確認し、かつ各要素(f)がnullでないか確認する
         return allFriends != null && allFriends.Any(f => f != null && f.isRecruited && f.effectType == t);
     }
 
-    // 【変更】親友データの初期化と条件のランダム割り当て
-    // 【修正】GameManager.cs の InitializeFriends 関数
-    // GameManager.cs の InitializeFriends メソッドを以下と差し替えてください
-
-    // 【変更】親友データの初期化と条件のランダム割り当て（自動補正版）
-    // 【変更】親友データの初期化（自動ロード機能付き）
-    // 【変更】フォルダから一括読み込みして初期化（シンプル版）
-    // 【修正】フォルダから読み込み + 名前未設定対策済み
-    // 【修正完了版】データ自動ロード + 名前未設定対策 + 条件一覧ログ出力
     void InitializeFriends()
     {
         Debug.Log("--- 友達データの読み込みと初期化を開始 ---");
@@ -870,7 +780,6 @@ public class GameManager : MonoBehaviour
 
         if (loadedData != null && loadedData.Length > 0)
         {
-            // リストを上書き
             allFriends = loadedData.ToList();
         }
         else
@@ -891,8 +800,7 @@ public class GameManager : MonoBehaviour
             f.isHintRevealed = false;
         }
 
-        // 4. 「アイ」役を決定（名前未設定でもエラーにならないよう対策済み）
-        // ★修正ポイント: f.friendName != null のチェックを追加
+        // 4. 「アイ」役を決定
         var ai = allFriends.FirstOrDefault(f =>
             f.isAi || (f.friendName != null && f.friendName.Contains("アイ"))
         );
@@ -903,7 +811,6 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // アイが見つからない場合、リストの先頭をアイ役にする
             if (allFriends.Count > 0)
             {
                 allFriends[0].assignedCondition = ConditionType.Ai_Fixed;
@@ -948,42 +855,29 @@ public class GameManager : MonoBehaviour
             if (i < randomConditions.Count)
                 remaining[i].assignedCondition = randomConditions[i];
             else
-                remaining[i].assignedCondition = ConditionType.Conversation; // 条件不足時は「会話」
+                remaining[i].assignedCondition = ConditionType.Conversation;
         }
 
-
-        // ★★★ 追加: 全員の名前と出現条件をログに出力 ★★★
+        // ログ出力
         Debug.Log("=========================================");
         Debug.Log($"【親友出現条件一覧】(全 {allFriends.Count} 名)");
-        Debug.Log("=========================================");
-
         foreach (var f in allFriends)
         {
-            // 名前がnullの場合は "名前未設定" と表示
             string dName = string.IsNullOrEmpty(f.friendName) ? "名前未設定" : f.friendName;
-
-            // 条件の詳細テキストを取得（ヒントテキストを活用）
-            // ※FriendData.GetHintText() は内部で friendName を使うため、名前未設定だと少し変な表示になる可能性がありますがエラーにはなりません
             string hint = f.GetHintText();
-
-            // ログを見やすく整形
-            // 例: [ミレイ] Happiness : ミレイは【GP増幅マスに5回止まる】と...
             Debug.Log($"[{dName}] 条件タイプ: {f.assignedCondition}\n詳細: {hint}");
         }
         Debug.Log("=========================================");
     }
 
-    // 【変更】親友出現条件の判定
+    // 親友出現条件の判定
     FriendData CheckSpecialConditionFriend()
     {
         if (allFriends == null) return null;
 
         foreach (var f in allFriends)
         {
-            // ★追加: nullチェック
             if (f == null) continue;
-
-            // 既に仲間、または教室配置のキャラはスキップ
             if (f.isRecruited || f.assignedCondition == ConditionType.Classroom) continue;
 
             bool isMet = false;

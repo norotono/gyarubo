@@ -23,7 +23,7 @@ public class MenuManager : MonoBehaviour
     public Button actionButton;         // 「使う」などのアクションボタン
     public TextMeshProUGUI actionBtnText; // ボタンの文字
 
-    // ★追加: 全画面オーバーレイ用UI (Unityエディタで設定が必要)
+    // ★追加: 全画面オーバーレイ用UI
     [Header("--- Full Screen Overlay UI ---")]
     public GameObject fullScreenPanel;        // 画面全体を覆うパネル
     public TextMeshProUGUI fullScreenTitle;   // タイトル
@@ -103,7 +103,7 @@ public class MenuManager : MonoBehaviour
         ClearList();
         headerText.text = "【彼氏】";
 
-        foreach (var m in gameManager.playerStats.maleFriendsList)
+        foreach (var m in gameManager.playerStats.boyfriendList) // 修正: boyfriendListを参照
         {
             if (m.isBoyfriend)
             {
@@ -128,6 +128,8 @@ public class MenuManager : MonoBehaviour
         headerText.text = "【所持アイテム】";
 
         // A. 移動カードの表示 (1~6)
+        // ItemManager側の playerStats.moveCards を集計して表示する形に変更推奨ですが
+        // ここではItemManagerのGetCardCountsが正しく実装されている前提とします
         var cardCounts = itemManager.GetCardCounts();
         foreach (var kvp in cardCounts)
         {
@@ -194,8 +196,6 @@ public class MenuManager : MonoBehaviour
     }
 
     // 詳細パネルを表示する
-    // action: ボタンを押した時の処理 (nullならボタン非表示)
-    // btnLabel: ボタンのテキスト (デフォルトは"使う")
     void ShowDetail(string title, string content, UnityEngine.Events.UnityAction action, string btnLabel = "使う")
     {
         detailPanel.SetActive(true);
@@ -211,55 +211,15 @@ public class MenuManager : MonoBehaviour
         }
         else
         {
-            // アクションがない場合（見るだけの時や生徒手帳）はボタンを隠す
             actionButton.gameObject.SetActive(false);
         }
-    }
-    public void OpenCardDiscardMenu(List<int> currentCards, int newCard, UnityEngine.Events.UnityAction<int> onDecision)
-    {
-        ClearList(); // 既存のリストをクリア
-
-        // ヘッダーと詳細パネルを使って状況を説明
-        headerText.text = "【カードがいっぱいです】";
-
-        detailPanel.SetActive(true);
-        detailTitle.text = "どれを捨てますか？";
-        detailDesc.text = $"手持ちが上限(5枚)です。\n新しく出たカード: <size=150%>{newCard}</size>\n\n捨てるカードを選んでください。\n(※選んだカードが消滅し、新しいカードが入ります)";
-
-        // アクションボタン（「使う」など）は今回は邪魔なので消す
-        if (actionButton != null) actionButton.gameObject.SetActive(false);
-
-        // 1. 既存の手持ちカードを「捨てる」ボタンとして生成
-        for (int i = 0; i < currentCards.Count; i++)
-        {
-            int cardVal = currentCards[i];
-            int index = i; // クロージャキャプチャ用（重要）
-
-            CreateListButton($"手持ち: [{cardVal}] を捨てる", () => {
-                // 決定処理
-                CloseDetail();     // メニュー詳細を閉じる
-                ClearList();       // リストも消す
-                headerText.text = ""; // ヘッダー戻す（必要に応じて）
-                onDecision(index); // 選んだインデックスを返す
-            });
-        }
-
-        // 2. 新しく引いたカードを「諦める」ボタン
-        CreateListButton($"新規: [{newCard}] を諦める", () => {
-            CloseDetail();
-            ClearList();
-            headerText.text = "";
-            onDecision(currentCards.Count); // リスト外のインデックス＝新規破棄扱い
-        });
-
-        // ★レイアウト更新の強制（ボタンが表示されない対策の一つとして）
-        LayoutRebuilder.ForceRebuildLayoutImmediate(listContent.GetComponent<RectTransform>());
     }
 
     public void CloseDetail()
     {
         detailPanel.SetActive(false);
     }
+
     // --- ★追加: カード入手時の確認 (Confirmation) ---
     public void ShowCardConfirmation(int cardValue, UnityEngine.Events.UnityAction onOk)
     {
@@ -281,7 +241,7 @@ public class MenuManager : MonoBehaviour
         });
     }
 
-    // --- ★追加: カード取捨選択メニュー ---
+    // --- ★追加: カード取捨選択メニュー (全画面版を使用) ---
     public void OpenCardDiscardMenu(List<int> currentCards, int newCard, UnityEngine.Events.UnityAction<int> onDecision)
     {
         fullScreenPanel.SetActive(true);
@@ -318,10 +278,9 @@ public class MenuManager : MonoBehaviour
         // レイアウト更新
         LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
-}
 
-// 親友効果の説明文用（簡易）
-string GetEffectDescription(FriendEffectType type)
+    // 親友効果の説明文用（簡易）
+    string GetEffectDescription(FriendEffectType type)
     {
         switch (type)
         {
@@ -331,4 +290,5 @@ string GetEffectDescription(FriendEffectType type)
             default: return "特別な効果はありません。";
         }
     }
-}
+
+} // ← クラスの終わりはここだけにする
