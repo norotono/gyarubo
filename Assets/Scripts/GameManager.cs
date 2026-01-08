@@ -39,7 +39,7 @@ public class GameManager : MonoBehaviour
     private int currentTileIndex = 0;
     private bool isMoving = false;
     private bool hasRerolledThisTurn = false;
-
+    
     // ★追加: アイテム管理と生徒手帳フラグ
     public ItemManager itemManager;
     public bool isHandbookActive = false;
@@ -60,7 +60,7 @@ public class GameManager : MonoBehaviour
         // 2. ステータス補正（ギャル力）
         int bonus = playerStats.GetGalGpBonus();
         int total = amount + bonus;
-
+        
         playerStats.gp += total;
 
         // ログ出力
@@ -75,7 +75,7 @@ public class GameManager : MonoBehaviour
         // ステータス補正（コミュ力）
         int bonus = playerStats.GetCommuFriendBonus();
         int total = count + bonus;
-
+        
         playerStats.friends += total;
 
         Debug.Log($"友達が {total}人 (基本{count} + コミュ{bonus}) 増えました。");
@@ -350,7 +350,7 @@ public class GameManager : MonoBehaviour
         Debug.Log($"教室(Tile:{tileIndex})で親友を探します。");
 
         // 簡易的に50%で発見
-        bool isSuccess = (Random.value < 0.5f);
+        bool isSuccess = (Random.value < 0.5f); 
 
         if (isSuccess)
         {
@@ -625,7 +625,7 @@ public class GameManager : MonoBehaviour
             switch (f.assignedCondition)
             {
                 case ConditionType.Happiness:
-                    if (playerStats.happiness >= 50) isMet = true;
+                    if (playerStats.happiness >= 50) isMet = true; 
                     break;
                 case ConditionType.Rich:
                     if (playerStats.gp >= 5000) isMet = true;
@@ -746,7 +746,7 @@ public class GameManager : MonoBehaviour
     }
 
     // --- 補助メソッド ---
-
+    
     // ★重複していた AddGP と AddFriend は上部に統合・削除しました。
     void AddLog(string msg) { Debug.Log(msg); if (phoneUI) phoneUI.AddLog(msg); }
 
@@ -855,7 +855,7 @@ public class GameManager : MonoBehaviour
             if (i < randomConditions.Count)
                 remaining[i].assignedCondition = randomConditions[i];
             else
-                remaining[i].assignedCondition = ConditionType.Conversation;
+                remaining[i].assignedCondition = ConditionType.Conversation; 
         }
 
         // ログ出力
