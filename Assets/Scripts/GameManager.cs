@@ -134,22 +134,15 @@ public class GameManager : MonoBehaviour
         if (isMoving) return;
         StartCoroutine(RollDiceSequence());
     }
-
     IEnumerator RollDiceSequence()
     {
-        // ... (サイコロアニメーション開始などはそのまま) ...
-
         // 1回目のロール
         int diceResult = Random.Range(1, 7);
-        // サイコロの目画像の更新処理があればここに記述
-        // UpdateDiceUI(diceResult); 
-
         Debug.Log($"ダイス結果: {diceResult}");
 
         yield return new WaitForSeconds(0.5f);
 
-        // ★追加: カオル(DiceReroll)の効果チェック
-        // カオルが仲間で、まだリロールしておらず、かつダイスUIが表示されている場合
+        // カオル(DiceReroll)の効果チェック
         if (HasFriendEffect(FriendEffectType.DiceReroll) && !hasRerolledThisTurn)
         {
             bool deciding = true;
@@ -161,7 +154,7 @@ public class GameManager : MonoBehaviour
                 $"今の出目は【{diceResult}】だよ。\n振り直す？",
                 "振り直す！",
                 "このまま進む",
-                null, // 3つ目はなし
+                null,
                 () => { doReroll = true; deciding = false; },   // Yes
                 () => { doReroll = false; deciding = false; },  // No
                 null
@@ -175,18 +168,35 @@ public class GameManager : MonoBehaviour
                 hasRerolledThisTurn = true;
                 Debug.Log("カオルの能力で振り直します！");
 
-                // もう一度ロール演出などを入れても良いですが、ここでは即座に値を更新
+                // 再ロール
                 diceResult = Random.Range(1, 7);
                 Debug.Log($"再ロール結果: {diceResult}");
-
-                // 結果表示の更新（必要なら）
-                // UpdateDiceUI(diceResult);
 
                 yield return new WaitForSeconds(0.5f);
             }
         }
 
-        // ここから移動処理（既存のコードへ）
+        // =================================================================
+        // ★変更点: 最終的な出目が確定した後、カットインを表示して確認を待つ処理を追加
+        // =================================================================
+        if (menuManager != null)
+        {
+            bool isConfirmed = false;
+
+            // MenuManagerのパネルで結果を表示
+            menuManager.ShowDiceResult(diceResult, () => isConfirmed = true);
+
+            // プレイヤーがボタンを押すまで待機
+            yield return new WaitUntil(() => isConfirmed);
+        }
+        else
+        {
+            // MenuManagerがない場合のフォールバック
+            yield return new WaitForSeconds(0.5f);
+        }
+        // =================================================================
+
+        // ここから移動処理
         yield return StartCoroutine(MovePlayer(diceResult));
     }
 
@@ -348,7 +358,7 @@ public class GameManager : MonoBehaviour
     // ---------------------------------------------------------
     // ★変更点2: 教室マスの処理 (確認フェーズの実装)
     // ---------------------------------------------------------
-    // --- ★修正: 教室ロジック (FullScreenPanel使用) ---
+    // 教室マスの処理
     void HandleClassroomTile(int tileIndex)
     {
         // 1. その教室に割り振られている親友を特定
@@ -356,25 +366,36 @@ public class GameManager : MonoBehaviour
         string roomName = floor2Rooms[roomIndex];
         var target = allFriends.FirstOrDefault(f => f.assignedRoom == roomName && !f.isRecruited);
 
-        bool hasHandbook = (playerStats.studentIdCount > 0);
+        // ★修正1: ItemManager経由で所持数を確認（統一感のため）
+        bool hasHandbook = (itemManager != null && itemManager.GetHandbookCount() > 0);
 
         // 2. MenuManagerの全画面パネルを使って分岐表示
-        // 引数: 手帳があるか, 調査する時のAction, やめる時のAction
         if (menuManager != null)
         {
             menuManager.ShowClassroomPanel(hasHandbook,
-                () => HandleClassroomChallenge(target), // 調査
+                () => {
+                    // ★修正2: ここで「消費ロジック」を実行
+                    // TryUseStudentHandbook() は内部で「枚数を-1」して、成功ならtrueを返します
+                    if (hasHandbook && itemManager != null && itemManager.TryUseStudentHandbook())
+                    {
+                        // 消費に成功したら調査実行
+                        HandleClassroomChallenge(target);
+                    }
+                    else
+                    {
+                        // 手帳がない、またはエラー時は終了
+                        EndTurn();
+                    }
+                },
                 EndTurn // やめる -> ターン終了
             );
         }
         else
         {
-            // MenuManagerがない場合のフォールバック（ログのみ）
             Debug.LogError("MenuManager is not assigned!");
             EndTurn();
         }
     }
-
     // 調査実行
     void HandleClassroomChallenge(FriendData target)
     {

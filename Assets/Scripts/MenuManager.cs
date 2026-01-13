@@ -74,6 +74,88 @@ public class MenuManager : MonoBehaviour
         LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
 
+    // --- ★追加: サイコロ結果のカットイン表示 ---
+    public void ShowDiceResult(int result, UnityEngine.Events.UnityAction onConfirm)
+    {
+        fullScreenPanel.SetActive(true);
+        foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
+
+        fullScreenTitle.text = "ダイス結果";
+        // 大きく数字を表示
+        fullScreenDesc.text = $"<size=200%>{result}</size>\nが出ました！";
+
+        // OKボタン
+        GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+        btn.GetComponentInChildren<TextMeshProUGUI>().text = "進む";
+        btn.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            fullScreenPanel.SetActive(false);
+            onConfirm.Invoke();
+        });
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
+    }
+
+    // --- ★追加: アイテムメニューの構築 (MenuManager管轄) ---
+    public void ShowItemList()
+    {
+        ClearList(); // 既存リストをクリア
+        headerText.text = "【アイテム一覧】";
+
+        // 1. 移動カード
+        var cardCounts = itemManager.GetCardCounts();
+        foreach (var kvp in cardCounts)
+        {
+            int num = kvp.Key;
+            int count = kvp.Value;
+            if (count > 0)
+            {
+                CreateListButton($"移動カード [{num}]  x{count}", () =>
+                {
+                    ShowDetail(
+                        $"移動カード [{num}]",
+                        "使用するとサイコロを振らずに、この数字の分だけ進めます。",
+                        () => itemManager.UseMovementCard(num),
+                        "使う"
+                    );
+                });
+            }
+        }
+
+        // 2. 生徒手帳 (ItemManager経由で取得)
+        int hbCount = itemManager.GetHandbookCount();
+        string hbLabel = (hbCount > 0) ? $"生徒手帳 (所持: {hbCount})" : "生徒手帳 (未所持)";
+        CreateListButton(hbLabel, () =>
+        {
+            string desc = (hbCount > 0)
+                ? "【効果】\n教室マスで使うと、中の様子を詳しく調べられます。\n(使うと1冊消費します)"
+                : "【未所持】\nこれがないと教室の中を詳しく調べられません。\n購買部で購入しましょう。";
+            // ボタンアクションは無し（詳細表示のみ）
+            ShowDetail("生徒手帳", desc, null);
+        });
+
+        // 3. その他アイテム
+        var invCounts = itemManager.GetItemCounts();
+        foreach (var kvp in invCounts)
+        {
+            string iName = kvp.Key;
+            int count = kvp.Value;
+            CreateListButton($"{iName}  x{count}", () =>
+            {
+                ShowDetail(iName, "このアイテムを使用しますか？", () => itemManager.UseItemByName(iName), "使う");
+            });
+        }
+
+        // 4. プレゼント
+        if (gameManager.playerStats.present > 0)
+        {
+            CreateListButton($"プレゼント x{gameManager.playerStats.present}", () =>
+            {
+                ShowDetail("プレゼント", "特定のイベントで渡すと親密度が上がります。", null);
+            });
+        }
+    }
+
     // --- 以下、既存のメソッド ---
     void ClearList()
     {

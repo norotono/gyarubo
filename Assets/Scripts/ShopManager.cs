@@ -33,7 +33,9 @@ public class ShopManager : MonoBehaviour
         shopItems.Clear();
 
         // --- 1. 生徒手帳 ---
-        shopItems.Add(new ShopItem("生徒手帳", 200, "教室用", () => stats.studentIdCount++));
+        shopItems.Add(new ShopItem("生徒手帳", 200, "教室用", () => {
+            if (itemManager) itemManager.AddStudentHandbook();
+        }));
 
         // --- 2. 移動カード（変更点） ---
         // 直接追加せず、ItemManagerのメソッドを呼んで上限チェックを行う

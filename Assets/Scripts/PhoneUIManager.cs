@@ -70,7 +70,19 @@ public class PhoneUIManager : MonoBehaviour
 
     public void OnItemBtn()
     {
-        RefreshItemList();
+        // 他のモードを閉じる
+        if (diceArea) diceArea.SetActive(false);
+        if (dialogScroll) dialogScroll.SetActive(false);
+
+        // アイテムパネルを開く（MenuManagerのUIを表示するためのコンテナとして機能）
+        if (itemPanel) itemPanel.SetActive(true);
+
+        // ★修正: 中身の生成はMenuManagerに任せる
+        var menuMgr = FindObjectOfType<MenuManager>();
+        if (menuMgr != null)
+        {
+            menuMgr.ShowItemList();
+        }
     }
 
     public void RefreshItemList()
@@ -202,15 +214,21 @@ public class PhoneUIManager : MonoBehaviour
             }
         }
     }
-
     public void ShowDiceMode()
     {
         if (diceArea) diceArea.SetActive(true);
         if (dialogScroll) dialogScroll.SetActive(false);
-        if (itemPanel) itemPanel.SetActive(false);
         if (menuArea) menuArea.SetActive(true);
-    }
 
+        // ★修正: アイテムウィンドウや詳細パネルを確実に閉じる
+        if (itemPanel) itemPanel.SetActive(false);
+
+        var menuMgr = FindObjectOfType<MenuManager>();
+        if (menuMgr != null)
+        {
+            menuMgr.CloseDetail(); // 詳細パネルも閉じる
+        }
+    }
     public void ShowDialogMode(string message)
     {
         if (diceArea) diceArea.SetActive(false);

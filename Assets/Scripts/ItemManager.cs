@@ -114,4 +114,34 @@ public class ItemManager : MonoBehaviour
             Debug.Log($"{itemName} を使用しました");
         }
     }
+
+    // --- ★追加: 生徒手帳の管理ロジック ---
+
+    // 生徒手帳を入手（ショップ等から呼ぶ）
+    public void AddStudentHandbook()
+    {
+        if (playerStats != null)
+        {
+            playerStats.studentIdCount++;
+            Debug.Log($"生徒手帳を入手しました。所持数: {playerStats.studentIdCount}");
+        }
+    }
+
+    // 所持数を確認
+    public int GetHandbookCount()
+    {
+        return (playerStats != null) ? playerStats.studentIdCount : 0;
+    }
+
+    // 生徒手帳を使用（消費成功ならtrue）
+    public bool TryUseStudentHandbook()
+    {
+        if (playerStats != null && playerStats.studentIdCount > 0)
+        {
+            playerStats.studentIdCount--;
+            Debug.Log($"生徒手帳を使用しました。残り: {playerStats.studentIdCount}");
+            return true;
+        }
+        return false;
+    }
 }
