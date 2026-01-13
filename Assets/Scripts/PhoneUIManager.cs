@@ -81,7 +81,6 @@ public class PhoneUIManager : MonoBehaviour
 
         foreach (Transform child in itemListRoot) Destroy(child.gameObject);
 
-        // ★修正: ItemManagerを安全に取得
         var itemManager = FindObjectOfType<ItemManager>();
 
         if (itemManager != null)
@@ -96,11 +95,7 @@ public class PhoneUIManager : MonoBehaviour
                 {
                     CreateItemButton($"移動カード [{num}]  x{count}", () =>
                     {
-                        // MenuManager経由で表示
-                        // 安全のためMenuManagerも探す
-                        var menuMgr = itemManager.menuManager;
-                        if (menuMgr == null) menuMgr = FindObjectOfType<MenuManager>();
-
+                        var menuMgr = itemManager.menuManager ? itemManager.menuManager : FindObjectOfType<MenuManager>();
                         if (menuMgr)
                         {
                             menuMgr.CloseDetail();
@@ -127,25 +122,21 @@ public class PhoneUIManager : MonoBehaviour
         }
 
         // C. 特殊アイテム
-        if (playerStats.eventForce > 0)
-        {
-            CreateItemButton($"イベント強制  x{playerStats.eventForce}", () =>
-            {
-                ShowGenericDetail("イベント強制", "現在のマスで強制的にイベントを発生させます。\n使用しますか？", () =>
-                {
-                    if (itemManager) itemManager.UseItemByName("イベント強制");
-                });
-            });
-        }
 
-        if (playerStats.studentIdCount > 0)
-        {
-            CreateItemButton($"生徒手帳  x{playerStats.studentIdCount}", () =>
-            {
-                ShowGenericDetail("生徒手帳", "【効果】\n教室マスで親友を探せるようになります。\n(※所持しているだけで効果があります)", null);
-            });
-        }
+        // ★修正: 生徒手帳 (0個でも表示して、持っていないことを確認可能にする)
+        string handbookText = (playerStats.studentIdCount > 0)
+            ? $"生徒手帳 (所持: {playerStats.studentIdCount})"
+            : "生徒手帳 (未所持)";
 
+        CreateItemButton(handbookText, () =>
+        {
+            string desc = (playerStats.studentIdCount > 0)
+                ? "【効果】\n教室マスで親友を探せるようになります。\n(※自動的に効果が発揮されます)"
+                : "【未所持】\nこれがないと教室の中を詳しく調べられません。\n購買部で購入しましょう。";
+            ShowGenericDetail("生徒手帳", desc, null);
+        });
+
+        // プレゼント (確認のみ)
         if (playerStats.present > 0)
         {
             CreateItemButton($"プレゼント  x{playerStats.present}", () =>
@@ -154,6 +145,7 @@ public class PhoneUIManager : MonoBehaviour
             });
         }
 
+        // 閉じるボタン
         CreateItemButton("閉じる", () =>
         {
             itemPanel.SetActive(false);

@@ -15,7 +15,6 @@ public class ItemManager : MonoBehaviour
 
     private void Start()
     {
-        // ★修正: 自動取得を追加
         if (menuManager == null) menuManager = FindObjectOfType<MenuManager>();
         if (gameManager == null) gameManager = FindObjectOfType<GameManager>();
         if (playerStats == null) playerStats = PlayerStats.Instance;
@@ -50,7 +49,6 @@ public class ItemManager : MonoBehaviour
     public void BuyOrGetMoveCard()
     {
         int newCardValue = Random.Range(1, 7);
-        // 安全策
         if (menuManager == null) menuManager = FindObjectOfType<MenuManager>();
         menuManager.ShowCardConfirmation(newCardValue, () => CheckCardLimit(newCardValue));
     }
@@ -106,25 +104,14 @@ public class ItemManager : MonoBehaviour
             used = true;
         }
 
-        if (!used)
-        {
-            if (itemName == "イベント強制")
-            {
-                if (playerStats.eventForce > 0)
-                {
-                    playerStats.eventForce--;
-                    Debug.Log("イベント強制アイテムを使用しました。");
-                    if (gameManager) gameManager.TriggerEventTileFromItem();
-                    used = true;
-                }
-            }
-        }
+        // ※イベント強制の処理は削除しました
 
         if (used)
         {
             if (menuManager) menuManager.CloseDetail();
             var phoneUI = FindObjectOfType<PhoneUIManager>();
             if (phoneUI && phoneUI.itemPanel.activeSelf) phoneUI.itemPanel.SetActive(false);
+            Debug.Log($"{itemName} を使用しました");
         }
     }
 }

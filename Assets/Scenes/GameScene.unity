@@ -4526,6 +4526,7 @@ MonoBehaviour:
   boardManager: {fileID: 1207487387}
   shopManager: {fileID: 1207487388}
   eventManager: {fileID: 1207487386}
+  menuManager: {fileID: 0}
   boyfriendManager: {fileID: 1207487389}
   currentGrade: 1
   moveSpeed: 0.3
@@ -4647,6 +4648,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 86c8a2eb403d1b64390008397174cf97, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopManager
+  shopItems: []
   shopPanel: {fileID: 1516870265}
   shopContent: {fileID: 1384557890}
   shopItemPrefab: {fileID: 5160460161080527102, guid: 1254f0eedad6a644cb81f0d0022cca6b, type: 3}
@@ -4871,7 +4873,7 @@ MonoBehaviour:
   m_text: Close
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 8193923773358487924, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -4936,7 +4938,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &1209836683
@@ -5145,7 +5147,7 @@ MonoBehaviour:
   m_text: "\u304A\u4ED5\u7F6E\u304D\u3060\u3079\u30FC\n"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
-  m_sharedMaterial: {fileID: 0}
+  m_sharedMaterial: {fileID: 8193923773358487924, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -5210,7 +5212,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &1285597388
@@ -6129,7 +6131,7 @@ MonoBehaviour:
   m_text: New Text
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
-  m_sharedMaterial: {fileID: 0}
+  m_sharedMaterial: {fileID: 8193923773358487924, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -6194,7 +6196,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: 0, w: -101.37689}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &1458353067
@@ -6949,7 +6951,7 @@ MonoBehaviour:
   m_text: "\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u6B21\u3078"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
-  m_sharedMaterial: {fileID: 0}
+  m_sharedMaterial: {fileID: 8193923773358487924, guid: 6c48270d8abee8e4bbf763839319f0cd, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -7014,7 +7016,7 @@ MonoBehaviour:
   m_margin: {x: 0, y: 0, z: -133.50977, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 1
+  m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!222 &1690331191
@@ -7415,7 +7417,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1780858676}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1207487388}
+        m_TargetAssemblyTypeName: ShopManager, Assembly-CSharp
+        m_MethodName: CloseShop
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1780858676
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8210,7 +8224,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1938704917
 RectTransform:
   m_ObjectHideFlags: 0
