@@ -28,7 +28,7 @@ public class MenuManager : MonoBehaviour
     public TextMeshProUGUI fullScreenTitle;   
     public TextMeshProUGUI fullScreenDesc;    
     public Transform fullScreenButtonRoot;    
-    public GameObject fullScreenButtonPrefab; 
+    public GameObject fullScreenButtonPrefab;
 
     // --- 教室イベント用パネル表示（追加） ---
     public void ShowClassroomPanel(bool hasHandbook, UnityEngine.Events.UnityAction onInvestigate, UnityEngine.Events.UnityAction onCancel)
@@ -37,14 +37,15 @@ public class MenuManager : MonoBehaviour
         foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
 
         fullScreenTitle.text = "教室イベント";
-        
+
         if (!hasHandbook)
         {
-            fullScreenDesc.text = "生徒手帳がないよ！\n中を調べることはできません。";
-            
+            // ★生徒手帳がない場合の演出テキスト
+            fullScreenDesc.text = "生徒手帳を持っていません。\n中の様子を詳しく調べることはできません。";
+
             // 戻るボタンのみ
             GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btn.GetComponentInChildren<TextMeshProUGUI>().text = "戻る";
+            btn.GetComponentInChildren<TextMeshProUGUI>().text = "立ち去る";
             btn.GetComponent<Button>().onClick.AddListener(() => {
                 fullScreenPanel.SetActive(false);
                 onCancel.Invoke();
@@ -52,17 +53,16 @@ public class MenuManager : MonoBehaviour
         }
         else
         {
-            fullScreenDesc.text = "生徒手帳を持っています。\n教室の中を調べますか？";
+            // 持っている場合
+            fullScreenDesc.text = "生徒手帳を使いますか？\n(手帳を1冊消費して、中の様子を詳しく調べます)";
 
-            // 調べるボタン
             GameObject btn1 = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btn1.GetComponentInChildren<TextMeshProUGUI>().text = "調べる";
+            btn1.GetComponentInChildren<TextMeshProUGUI>().text = "手帳を使う";
             btn1.GetComponent<Button>().onClick.AddListener(() => {
                 fullScreenPanel.SetActive(false);
                 onInvestigate.Invoke();
             });
 
-            // やめるボタン
             GameObject btn2 = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
             btn2.GetComponentInChildren<TextMeshProUGUI>().text = "やめる";
             btn2.GetComponent<Button>().onClick.AddListener(() => {
@@ -70,28 +70,6 @@ public class MenuManager : MonoBehaviour
                 onCancel.Invoke();
             });
         }
-        
-        LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
-    }
-
-    // --- ★追加: サイコロ結果のカットイン表示 ---
-    public void ShowDiceResult(int result, UnityEngine.Events.UnityAction onConfirm)
-    {
-        fullScreenPanel.SetActive(true);
-        foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
-
-        fullScreenTitle.text = "ダイス結果";
-        // 大きく数字を表示
-        fullScreenDesc.text = $"<size=200%>{result}</size>\nが出ました！";
-
-        // OKボタン
-        GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-        btn.GetComponentInChildren<TextMeshProUGUI>().text = "進む";
-        btn.GetComponent<Button>().onClick.AddListener(() =>
-        {
-            fullScreenPanel.SetActive(false);
-            onConfirm.Invoke();
-        });
 
         LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
@@ -154,6 +132,27 @@ public class MenuManager : MonoBehaviour
                 ShowDetail("プレゼント", "特定のイベントで渡すと親密度が上がります。", null);
             });
         }
+    }
+
+    // ★追加: サイコロの目をカットインで表示
+    // ★追加: サイコロの目をカットインで表示
+    public void ShowDiceResult(int result, UnityEngine.Events.UnityAction onConfirm)
+    {
+        fullScreenPanel.SetActive(true);
+        foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
+
+        fullScreenTitle.text = "ダイス結果";
+        fullScreenDesc.text = $"<size=200%>{result}</size>\nが出ました！";
+
+        GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+        btn.GetComponentInChildren<TextMeshProUGUI>().text = "進む";
+        btn.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            fullScreenPanel.SetActive(false);
+            onConfirm.Invoke();
+        });
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
 
     // --- 以下、既存のメソッド ---
@@ -234,65 +233,54 @@ public class MenuManager : MonoBehaviour
     }
 
     // 公開メソッドにしてItemManagerからも呼べるようにする
+    // ★修正: アイテムリストの表示 (ItemManagerから情報を取得して構築)
     public void RefreshItemList()
     {
-        ClearList();
+        ClearList(); // 既存のリストをクリア
         headerText.text = "【所持アイテム】";
 
-        // A. 移動カードの表示 (1~6)
-        // ItemManager側の playerStats.moveCards を集計して表示する形に変更推奨ですが
-        // ここではItemManagerのGetCardCountsが正しく実装されている前提とします
+        // 1. 移動カードの表示
+        // (ItemManagerにGetCardCountsがある前提)
         var cardCounts = itemManager.GetCardCounts();
         foreach (var kvp in cardCounts)
         {
-            int num = kvp.Key;   // カードの数字
-            int count = kvp.Value; // 枚数
-
+            int num = kvp.Key;
+            int count = kvp.Value;
             if (count > 0)
             {
                 string label = $"移動カード [{num}]  x{count}";
                 CreateListButton(label, () =>
                 {
-                    // カードの詳細を表示
                     ShowDetail(
                         $"移動カード [{num}]",
                         "使用するとサイコロを振らずに、この数字の分だけ進めます。",
-                        () => itemManager.UseMovementCard(num), // アクション: 使用
+                        () => itemManager.UseMovementCard(num),
                         "使う"
                     );
                 });
             }
         }
+        // 2. 生徒手帳 (所持数0でも表示)
+        int hbCount = itemManager.GetHandbookCount();
+        string hbLabel = (hbCount > 0) ? $"生徒手帳 (所持: {hbCount})" : "生徒手帳 (未所持)";
 
-        // B. 通常アイテムの表示
+        CreateListButton(hbLabel, () =>
+        {
+            string desc = (hbCount > 0)
+                ? "【効果】\n教室マスで使用すると、中の様子を詳しく調べられます。\n(使うと1冊消費します)"
+                : "【未所持】\nこれがないと教室の中を詳しく調べられません。\n購買部で購入しましょう。";
+            ShowDetail("生徒手帳", desc, null);
+        });
+
+        // 3. その他アイテム (ItemManagerのInventoryリスト)
         var itemCounts = itemManager.GetItemCounts();
         foreach (var kvp in itemCounts)
         {
             string iName = kvp.Key;
             int count = kvp.Value;
-
-            string label = $"{iName}  x{count}";
-            CreateListButton(label, () =>
+            CreateListButton($"{iName}  x{count}", () =>
             {
-                // 生徒手帳の場合
-                if (iName == "生徒手帳")
-                {
-                    ShowDetail(
-                        iName,
-                        "【効果】\n教室マスに止まった際、行動を選択できるようになります。\n(※ここでは使用できません。教室マスで自動的に選択肢が出ます)",
-                        null // アクションなし
-                    );
-                }
-                // 強制イベントなどその他の場合
-                else
-                {
-                    ShowDetail(
-                        iName,
-                        "【効果】\nこのアイテムを使用しますか？",
-                        () => itemManager.UseItemByName(iName), // アクション: 使用
-                        "使う"
-                    );
-                }
+                ShowDetail(iName, "このアイテムを使用しますか？", () => itemManager.UseItemByName(iName), "使う");
             });
         }
     }

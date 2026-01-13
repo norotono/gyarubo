@@ -32,11 +32,11 @@ public class ShopManager : MonoBehaviour
     {
         shopItems.Clear();
 
-        // --- 1. 生徒手帳 ---
+        // --- 1. 生徒手帳 (ItemManager経由で追加) ---
         shopItems.Add(new ShopItem("生徒手帳", 200, "教室用", () => {
             if (itemManager) itemManager.AddStudentHandbook();
+            else stats.studentIdCount++; // 安全策
         }));
-
         // --- 2. 移動カード（変更点） ---
         // 直接追加せず、ItemManagerのメソッドを呼んで上限チェックを行う
         shopItems.Add(new ShopItem("移動カード", 150, "ランダム", () => {
@@ -59,9 +59,6 @@ public class ShopManager : MonoBehaviour
                 Debug.Log(log);
             }
         }));
-
-        // --- 4. 強制イベント ---
-        shopItems.Add(new ShopItem("イベント強制", 800, "マス無視", () => stats.eventForce++));
 
         // --- 5. ステータスUP（変更点：3種類に分割） ---
         shopItems.Add(new ShopItem("会話術の本", 1500, "コミュLv+1", () => {

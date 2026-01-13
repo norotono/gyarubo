@@ -5,33 +5,28 @@ using System.Linq;
 
 public class ItemManager : MonoBehaviour
 {
+    [Header("References")]
     public GameManager gameManager;
     public PlayerStats playerStats;
     public EventManager eventManager;
     public MenuManager menuManager;
 
+    [Header("Settings")]
     public const int MaxCards = 5;
+
+    // 通常アイテム（インベントリ管理用）
     public List<ItemData> inventory = new List<ItemData>();
 
     private void Start()
     {
+        // 参照の自動取得
         if (menuManager == null) menuManager = FindObjectOfType<MenuManager>();
         if (gameManager == null) gameManager = FindObjectOfType<GameManager>();
         if (playerStats == null) playerStats = PlayerStats.Instance;
         if (eventManager == null) eventManager = FindObjectOfType<EventManager>();
     }
 
-    public Dictionary<string, int> GetItemCounts()
-    {
-        Dictionary<string, int> counts = new Dictionary<string, int>();
-        foreach (var item in inventory)
-        {
-            if (counts.ContainsKey(item.itemName)) counts[item.itemName]++;
-            else counts.Add(item.itemName, 1);
-        }
-        return counts;
-    }
-
+    // --- 1. 移動カード管理 ---
     public Dictionary<int, int> GetCardCounts()
     {
         Dictionary<int, int> counts = new Dictionary<int, int>();
@@ -94,30 +89,9 @@ public class ItemManager : MonoBehaviour
         }
     }
 
-    public void UseItemByName(string itemName)
-    {
-        bool used = false;
-        var item = inventory.FirstOrDefault(x => x.itemName == itemName);
-        if (item != null)
-        {
-            inventory.Remove(item);
-            used = true;
-        }
+    // --- 2. ★追加: 生徒手帳管理 (専用ロジック) ---
 
-        // ※イベント強制の処理は削除しました
-
-        if (used)
-        {
-            if (menuManager) menuManager.CloseDetail();
-            var phoneUI = FindObjectOfType<PhoneUIManager>();
-            if (phoneUI && phoneUI.itemPanel.activeSelf) phoneUI.itemPanel.SetActive(false);
-            Debug.Log($"{itemName} を使用しました");
-        }
-    }
-
-    // --- ★追加: 生徒手帳の管理ロジック ---
-
-    // 生徒手帳を入手（ショップ等から呼ぶ）
+    // 入手（ショップ等から呼ばれる）
     public void AddStudentHandbook()
     {
         if (playerStats != null)
@@ -127,13 +101,13 @@ public class ItemManager : MonoBehaviour
         }
     }
 
-    // 所持数を確認
+    // 個数確認
     public int GetHandbookCount()
     {
         return (playerStats != null) ? playerStats.studentIdCount : 0;
     }
 
-    // 生徒手帳を使用（消費成功ならtrue）
+    // 消費（使用成功ならtrueを返す）
     public bool TryUseStudentHandbook()
     {
         if (playerStats != null && playerStats.studentIdCount > 0)
@@ -143,5 +117,34 @@ public class ItemManager : MonoBehaviour
             return true;
         }
         return false;
+    }
+
+    // --- 3. その他アイテム管理 ---
+    public Dictionary<string, int> GetItemCounts()
+    {
+        Dictionary<string, int> counts = new Dictionary<string, int>();
+        foreach (var item in inventory)
+        {
+            if (counts.ContainsKey(item.itemName)) counts[item.itemName]++;
+            else counts.Add(item.itemName, 1);
+        }
+        return counts;
+    }
+
+
+    public void UseItemByName(string itemName)
+    {
+        // インベントリ内のアイテム使用処理
+        var item = inventory.FirstOrDefault(x => x.itemName == itemName);
+        if (item != null)
+        {
+            inventory.Remove(item);
+            Debug.Log($"{itemName} を使用しました");
+
+            if (menuManager) menuManager.CloseDetail();
+            var phoneUI = FindObjectOfType<PhoneUIManager>();
+            if (phoneUI && phoneUI.itemPanel.activeSelf) phoneUI.itemPanel.SetActive(false);
+        }
+        // イベント強制アイテムの処理は削除しました
     }
 }

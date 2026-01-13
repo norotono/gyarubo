@@ -179,24 +179,17 @@ public class GameManager : MonoBehaviour
         // =================================================================
         // ★変更点: 最終的な出目が確定した後、カットインを表示して確認を待つ処理を追加
         // =================================================================
+        yield return new WaitForSeconds(0.5f);
+
+        // ★追加: サイコロの目をカットインで確認
         if (menuManager != null)
         {
             bool isConfirmed = false;
-
-            // MenuManagerのパネルで結果を表示
+            // MenuManagerに後述のShowDiceResultを追加してください
             menuManager.ShowDiceResult(diceResult, () => isConfirmed = true);
-
-            // プレイヤーがボタンを押すまで待機
             yield return new WaitUntil(() => isConfirmed);
         }
-        else
-        {
-            // MenuManagerがない場合のフォールバック
-            yield return new WaitForSeconds(0.5f);
-        }
-        // =================================================================
 
-        // ここから移動処理
         yield return StartCoroutine(MovePlayer(diceResult));
     }
 
@@ -361,33 +354,31 @@ public class GameManager : MonoBehaviour
     // 教室マスの処理
     void HandleClassroomTile(int tileIndex)
     {
-        // 1. その教室に割り振られている親友を特定
+        // 部屋とターゲットの特定
         int roomIndex = tileIndex % floor2Rooms.Count;
         string roomName = floor2Rooms[roomIndex];
         var target = allFriends.FirstOrDefault(f => f.assignedRoom == roomName && !f.isRecruited);
 
-        // ★修正1: ItemManager経由で所持数を確認（統一感のため）
+        // ★ItemManagerを使って所持数を確認
         bool hasHandbook = (itemManager != null && itemManager.GetHandbookCount() > 0);
 
-        // 2. MenuManagerの全画面パネルを使って分岐表示
         if (menuManager != null)
         {
+            // パネル表示 (MenuManager側で「手帳がある/ない」のメッセージを出し分ける)
             menuManager.ShowClassroomPanel(hasHandbook,
                 () => {
-                    // ★修正2: ここで「消費ロジック」を実行
-                    // TryUseStudentHandbook() は内部で「枚数を-1」して、成功ならtrueを返します
-                    if (hasHandbook && itemManager != null && itemManager.TryUseStudentHandbook())
+                    // 「調査する」を選んだ場合 (手帳がある時のみ押せる)
+                    if (hasHandbook && itemManager != null)
                     {
-                        // 消費に成功したら調査実行
-                        HandleClassroomChallenge(target);
-                    }
-                    else
-                    {
-                        // 手帳がない、またはエラー時は終了
-                        EndTurn();
+                        // ★ここで消費を実行 (-1する)
+                        if (itemManager.TryUseStudentHandbook())
+                        {
+                            if (phoneUI) phoneUI.AddLog("生徒手帳を1冊消費しました。");
+                            HandleClassroomChallenge(target);
+                        }
                     }
                 },
-                EndTurn // やめる -> ターン終了
+                EndTurn // 「やめる」または「戻る」
             );
         }
         else
@@ -396,6 +387,8 @@ public class GameManager : MonoBehaviour
             EndTurn();
         }
     }
+
+
     // 調査実行
     void HandleClassroomChallenge(FriendData target)
     {
