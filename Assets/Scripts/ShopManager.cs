@@ -14,6 +14,9 @@ public class ShopManager : MonoBehaviour
     public GameObject shopCloseButton;
     public ItemManager itemManager;
 
+
+    private PlayerStats currentPlayerStats;
+    private bool isDiscountActive = false;
     // 内部ステート
     private List<ShopItem> shopItems = new List<ShopItem>();
     public bool IsShopOpen { get; private set; } = false;
@@ -33,13 +36,15 @@ public class ShopManager : MonoBehaviour
         shopItems.Clear();
 
         // --- 1. 生徒手帳 (ItemManager経由で追加) ---
-        shopItems.Add(new ShopItem("生徒手帳", 200, "教室用", () => {
+        shopItems.Add(new ShopItem("生徒手帳", 200, "教室用", () =>
+        {
             if (itemManager) itemManager.AddStudentHandbook();
             else stats.studentIdCount++; // 安全策
         }));
         // --- 2. 移動カード（変更点） ---
         // 直接追加せず、ItemManagerのメソッドを呼んで上限チェックを行う
-        shopItems.Add(new ShopItem("移動カード", 150, "ランダム", () => {
+        shopItems.Add(new ShopItem("移動カード", 150, "ランダム", () =>
+        {
             if (itemManager != null)
             {
                 itemManager.BuyOrGetMoveCard();
@@ -51,7 +56,8 @@ public class ShopManager : MonoBehaviour
         }));
 
         // --- 3. プレゼント ---
-        shopItems.Add(new ShopItem("プレゼント", 500, "親密度UP", () => {
+        shopItems.Add(new ShopItem("プレゼント", 500, "親密度UP", () =>
+        {
             var bfMgr = FindObjectOfType<BoyfriendManager>();
             if (bfMgr)
             {
@@ -61,16 +67,20 @@ public class ShopManager : MonoBehaviour
         }));
 
         // --- 5. ステータスUP（変更点：3種類に分割） ---
-        shopItems.Add(new ShopItem("会話術の本", 1500, "コミュLv+1", () => {
-            stats.commuLv++;
+        shopItems.Add(new ShopItem("会話術の本", 1500, "コミュLv+1", () =>
+        {
+            // stats.commuLv++; // 古い記述
+            stats.AddStatus("Commu", 1); // 新しい記述
             Debug.Log("コミュ力が上がった！");
         }));
-        shopItems.Add(new ShopItem("流行コスメ", 1500, "ギャルLv+1", () => {
-            stats.galLv++;
+        shopItems.Add(new ShopItem("流行コスメ", 1500, "ギャルLv+1", () =>
+        {
+            stats.AddStatus("Gal", 1);
             Debug.Log("ギャル力が上がった！");
         }));
-        shopItems.Add(new ShopItem("恋愛小説", 1500, "レモンLv+1", () => {
-            stats.lemonLv++;
+        shopItems.Add(new ShopItem("恋愛小説", 1500, "レモンLv+1", () =>
+        {
+            stats.AddStatus("Lemon", 1);
             Debug.Log("レモン力が上がった！");
         }));
 
@@ -85,6 +95,7 @@ public class ShopManager : MonoBehaviour
     // ショップを開く（コルーチンで待機できるようにする）
     public IEnumerator OpenShopSequence(PlayerStats stats, bool isDiscount)
     {
+        currentPlayerStats = stats;
         IsShopOpen = true;
         if (shopPanel) shopPanel.SetActive(true);
 
@@ -141,7 +152,8 @@ public class ShopManager : MonoBehaviour
             currentShopButtons.Add(new ActiveShopButton { button = btn, price = finalPrice });
 
             // クリックイベント
-            btn.onClick.AddListener(() => {
+            btn.onClick.AddListener(() =>
+            {
                 if (stats.gp >= finalPrice)
                 {
                     stats.gp -= finalPrice;
@@ -162,15 +174,65 @@ public class ShopManager : MonoBehaviour
         RefreshButtons(stats.gp);
     }
 
-    // 所持金に応じてボタンの有効/無効を更新
-    public void RefreshButtons(int currentGp)
+    // ★修正: ボタンに「名前 + 値段」を表示するように変更
+    public void RefreshButtons(int currentGP)
     {
-        foreach (var btnData in currentShopButtons)
+        // エラー回避: shopContentが割り当てられていない場合は処理しない
+        if (shopContent == null) return;
+
+        foreach (Transform child in shopContent) Destroy(child.gameObject);
+
+        foreach (var item in shopItems)
         {
-            if (btnData.button != null)
+            int finalPrice = isDiscountActive ? (int)(item.price * 0.8f) : item.price;
+
+            GameObject btnObj = Instantiate(shopItemPrefab, shopContent);
+            var texts = btnObj.GetComponentsInChildren<TextMeshProUGUI>();
+
+            // ★変更点: 1つ目のテキストに「名前 + 値段」をまとめて表示
+            if (texts.Length > 0)
             {
-                btnData.button.interactable = (currentGp >= btnData.price);
+                texts[0].text = $"{item.itemName}   <color=yellow>{finalPrice} G</color>";
             }
+
+            // もしPrefabに2つ目のテキスト（説明用など）があれば設定
+            if (texts.Length > 1) texts[1].text = item.description;
+
+            // --- 購入可否の判定 ---
+            Button btn = btnObj.GetComponent<Button>();
+            bool canBuy = (currentGP >= finalPrice);
+
+            // ステータス上限(5)のチェック
+            if (currentPlayerStats != null)
+            {
+                if (item.itemName == "会話術の本" && currentPlayerStats.commuLv >= 5) canBuy = false;
+                if (item.itemName == "流行コスメ" && currentPlayerStats.galLv >= 5) canBuy = false;
+                if (item.itemName == "恋愛小説" && currentPlayerStats.lemonLv >= 5) canBuy = false;
+            }
+
+            // 売り切れ(MAX)表示
+            if (!canBuy && currentGP >= finalPrice)
+            {
+                // お金はあるのに買えない場合 = MAX
+                if (texts.Length > 0) texts[0].text += " (MAX)";
+            }
+
+            btn.interactable = canBuy;
+
+            btn.onClick.RemoveAllListeners();
+            btn.onClick.AddListener(() =>
+            {
+                if (currentPlayerStats != null && currentPlayerStats.gp >= finalPrice)
+                {
+                    currentPlayerStats.gp -= finalPrice;
+                    if (item.onBuy != null) item.onBuy.Invoke();
+
+                    RefreshButtons(currentPlayerStats.gp);
+
+                    if (shopInfoText != null)
+                        shopInfoText.text = $"残高: {currentPlayerStats.gp:N0} GP";
+                }
+            });
         }
     }
 }

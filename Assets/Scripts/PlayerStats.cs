@@ -82,4 +82,13 @@ public class PlayerStats : MonoBehaviour
                GetEffectiveGalLv() >= value &&
                GetEffectiveLemonLv() >= value;
     }
+    public void AddStatus(string type, int amount)
+    {
+        switch (type)
+        {
+            case "Commu": commuLv = Mathf.Min(commuLv + amount, 5); break;
+            case "Gal": galLv = Mathf.Min(galLv + amount, 5); break;
+            case "Lemon": lemonLv = Mathf.Min(lemonLv + amount, 5); break;
+        }
+    }
 }

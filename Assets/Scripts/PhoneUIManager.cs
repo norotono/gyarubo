@@ -210,22 +210,40 @@ public class PhoneUIManager : MonoBehaviour
             }
         }
     }
+
+    [Header("Dice Display")]
+    public Image diceDisplayImage; // ★Inspectorで dice_area 内のImageをアタッチ
+
+    // --- ★追加: ダイス画像更新 ---
+    public void UpdateDiceImage(Sprite sprite)
+    {
+        if (diceDisplayImage != null)
+        {
+            diceDisplayImage.gameObject.SetActive(true);
+            diceDisplayImage.sprite = sprite;
+        }
+    }
+
+    // --- ★修正: 閉じるボタンの挙動 ---
     public void ShowDiceMode()
     {
-        // 1. エリア表示: ログ(DialogScroll)とメニューボタン(MenuArea)を表示
+        // 1. エリア表示
         if (diceArea) diceArea.SetActive(true);
-        if (dialogScroll) dialogScroll.SetActive(true); // ★ログを表示する
+        if (dialogScroll) dialogScroll.SetActive(true); // ログは表示
         if (menuArea) menuArea.SetActive(true);
 
-        // 2. 被さっているウィンドウを強制的に閉じる
+        // 2. ウィンドウを閉じる
         if (itemPanel) itemPanel.SetActive(false);
 
-        // 3. 詳細パネルも閉じる
+        // 3. アイテムボタン等をクリア (LogAreaのボタンを消す)
+        // ※ itemListRoot はアイテム一覧用なので消してOK
+        foreach (Transform child in itemListRoot) Destroy(child.gameObject);
+
+        // 4. MenuManagerの詳細パネルも閉じる
         var menuMgr = FindObjectOfType<MenuManager>();
         if (menuMgr != null)
         {
             menuMgr.CloseDetail();
-            // 親友などのFullScreenPanelが開いている場合も考慮して閉じる
             if (menuMgr.fullScreenPanel) menuMgr.fullScreenPanel.SetActive(false);
         }
     }

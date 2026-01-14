@@ -29,12 +29,52 @@ public class MenuManager : MonoBehaviour
     public TextMeshProUGUI fullScreenDesc;    
     public Transform fullScreenButtonRoot;    
     public GameObject fullScreenButtonPrefab;
-
+    // fullScreenPanelの中に新しくImageを作ってアタッチするか、diceResultImageを流用してもOKです
+    public Image friendFaceImage;
+    public Image detailImage;
     // ★追加: ダイス画像を表示するためのImageコンポーネント
     public Image diceResultImage;
 
     // --- 教室イベント用パネル表示（追加） ---
     // --- ★修正: 教室イベント用パネル表示 ---
+    public void ShowFriendRecruited(FriendData friend, UnityEngine.Events.UnityAction onConfirm)
+    {
+        // 1. パネルを表示
+        detailPanel.SetActive(true);
+
+        // 2. タイトルと説明文の設定
+        detailTitle.text = "親友成立！";
+
+        string effectDesc = GetEffectDescription(friend.effectType);
+        detailDesc.text = $"<b>{friend.friendName}</b> が親友になった！\n\n【能力】\n{effectDesc}";
+
+        // 3. 顔アイコンの設定
+        if (detailImage != null)
+        {
+            if (friend.faceIcon != null)
+            {
+                detailImage.gameObject.SetActive(true);
+                detailImage.sprite = friend.faceIcon;
+            }
+            else
+            {
+                detailImage.gameObject.SetActive(false);
+            }
+        }
+
+        // 4. OKボタンの設定
+        actionButton.gameObject.SetActive(true);
+        actionBtnText.text = "OK"; // ボタンのテキスト
+
+        actionButton.onClick.RemoveAllListeners();
+        actionButton.onClick.AddListener(() =>
+        {
+            // 閉じる処理
+            detailPanel.SetActive(false);
+            if (detailImage != null) detailImage.gameObject.SetActive(false);
+            onConfirm.Invoke();
+        });
+    }
     // --- ★修正: 教室パネル (ボタンのクリアと生成を確実に) ---
     public void ShowClassroomPanel(bool hasHandbook, UnityEngine.Events.UnityAction onInvestigate, UnityEngine.Events.UnityAction onCancel)
     {

@@ -170,6 +170,12 @@ public class GameManager : MonoBehaviour
                 yield return new WaitForSeconds(0.5f);
             }
         }
+        if (phoneUI != null && diceSprites != null && diceResult > 0 && diceResult <= diceSprites.Length)
+        {
+            phoneUI.UpdateDiceImage(diceSprites[diceResult - 1]);
+        }
+
+        yield return new WaitForSeconds(0.5f);
 
         // 移動開始
         yield return StartCoroutine(MovePlayer(diceResult));
@@ -648,21 +654,28 @@ public class GameManager : MonoBehaviour
 
             // --- 条件達成時の処理 ---
             if (isMet)
-            {
-                bool processed = false;
-                f.isRecruited = true;
-                f.isHintRevealed = true; // 出会ったのでヒントも公開
+                {
+                    bool ok = false;
+                    f.isRecruited = true;
 
-                // 登場ダイアログを表示
-                eventManager.ShowChoicePanel(
-                    $"【親友登場！】\n{f.friendName} が現れた！\n(条件: {f.assignedCondition} 達成)",
-                    new string[] { "仲間にする" },
-                    new UnityEngine.Events.UnityAction[] { () => processed = true }
-                );
+                    // ★修正: MenuManagerのカットインを使用
+                    if (menuManager != null)
+                    {
+                        menuManager.ShowFriendRecruited(f, () => ok = true);
+                    }
+                    else
+                    {
+                        eventManager.ShowMessage($"{f.friendName} が親友になった！", () => ok = true);
+                    }
 
-                // プレイヤーがボタンを押すまで待機
-                yield return new WaitUntil(() => processed);
-            }
+                    if (f.effectType == FriendEffectType.DoubleScoreOnJoin)
+                    {
+                        playerStats.friends *= 2;
+                        if (phoneUI) phoneUI.AddLog("アイの能力: 友達数が2倍になった！");
+                    }
+
+                    yield return new WaitUntil(() => ok);
+                }
         }
 
         // 全員のチェックが終わったら、元の終了処理へ
