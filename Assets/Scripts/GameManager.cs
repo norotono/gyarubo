@@ -393,6 +393,17 @@ public class GameManager : MonoBehaviour
         {
             target.isRecruited = true;
             target.isHintRevealed = true;
+            // ★修正: 親友詳細パネルを表示 (MenuManager経由)
+            if (menuManager != null)
+            {
+                // OKボタンを押したらターン終了
+                menuManager.ShowFriendRecruited(target, EndTurn);
+            }
+            else
+            {
+                // MenuManagerがない場合のバックアップ
+                eventManager.ShowMessage($"【成功】\n{target.friendName} が親友になりました！", EndTurn);
+            }
             eventManager.ShowMessage($"【成功】\n教室で {target.friendName} を見つけました！\n親友になりました。", EndTurn);
         }
         else
@@ -658,23 +669,27 @@ public class GameManager : MonoBehaviour
                     bool ok = false;
                     f.isRecruited = true;
 
-                    // ★修正: MenuManagerのカットインを使用
-                    if (menuManager != null)
-                    {
-                        menuManager.ShowFriendRecruited(f, () => ok = true);
-                    }
-                    else
-                    {
-                        eventManager.ShowMessage($"{f.friendName} が親友になった！", () => ok = true);
-                    }
+                // ★修正: MenuManagerのカットインを使用
+                if (menuManager != null)
+                {
+                    // パネルを表示して、OKボタンが押されるまで待機
+                    menuManager.ShowFriendRecruited(f, () => ok = true);
+                }
+                else
+                {
+                    // バックアップ
+                    eventManager.ShowMessage($"{f.friendName} が親友になった！", () => ok = true);
+                }
 
-                    if (f.effectType == FriendEffectType.DoubleScoreOnJoin)
+                // プレイヤーの操作待ち
+                yield return new WaitUntil(() => ok);
+
+                if (f.effectType == FriendEffectType.DoubleScoreOnJoin)
                     {
                         playerStats.friends *= 2;
                         if (phoneUI) phoneUI.AddLog("アイの能力: 友達数が2倍になった！");
                     }
 
-                    yield return new WaitUntil(() => ok);
                 }
         }
 

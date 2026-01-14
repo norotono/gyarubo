@@ -191,8 +191,14 @@ public class ShopManager : MonoBehaviour
 
             // ★変更点: 1つ目のテキストに「名前 + 値段」をまとめて表示
             if (texts.Length > 0)
-            {
-                texts[0].text = $"{item.itemName}   <color=yellow>{finalPrice} G</color>";
+{
+                // 折り返しを無効化
+                texts[0].enableWordWrapping = false; 
+                texts[0].overflowMode = TextOverflowModes.Ellipsis; // はみ出たら...にする（念のため）
+                texts[0].enableAutoSizing = true;    // 枠に合わせて文字を小さくする
+                texts[0].fontSizeMin = 10f;          // 最小サイズ
+                texts[0].fontSizeMax = 36f;          // 最大サイズ（元の設定に合わせる）
+                texts[0].text = $"<nobr>{item.itemName}  <color=red>{finalPrice}G</color></nobr>";
             }
 
             // もしPrefabに2つ目のテキスト（説明用など）があれば設定
