@@ -30,32 +30,50 @@ public class MenuManager : MonoBehaviour
     public Transform fullScreenButtonRoot;    
     public GameObject fullScreenButtonPrefab;
 
+    // ★追加: ダイス画像を表示するためのImageコンポーネント
+    public Image diceResultImage;
+
     // --- 教室イベント用パネル表示（追加） ---
     // --- ★修正: 教室イベント用パネル表示 ---
+    // --- ★修正: 教室パネル (ボタンのクリアと生成を確実に) ---
     public void ShowClassroomPanel(bool hasHandbook, UnityEngine.Events.UnityAction onInvestigate, UnityEngine.Events.UnityAction onCancel)
     {
-        // 1. パネルを必ず表示
-        fullScreenPanel.SetActive(true);
+        // パネルをアクティブ化
+        if (fullScreenPanel) fullScreenPanel.SetActive(true);
+        else Debug.LogError("MenuManager: FullScreenPanel is not assigned!");
 
-        // 2. 既存ボタンのクリア
+        // 古いボタンを削除
         foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
 
         fullScreenTitle.text = "教室イベント";
 
-        if (hasHandbook)
+        if (!hasHandbook)
         {
-            // --- パターンA: 手帳を持っている場合 ---
-            fullScreenDesc.text = "生徒手帳を持っています。\n手帳を1冊消費して、中の様子を調査しますか？";
+            // 手帳なし
+            fullScreenDesc.text = "生徒手帳を持っていません。\n中の様子を詳しく調べることはできません。";
 
-            // ボタン1: 調査する
-            GameObject btnInvestigate = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btnInvestigate.GetComponentInChildren<TextMeshProUGUI>().text = "調査する";
-            btnInvestigate.GetComponent<Button>().onClick.AddListener(() => {
-                fullScreenPanel.SetActive(false); // 閉じてから実行
+            // 立ち去るボタン
+            GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btn.GetComponentInChildren<TextMeshProUGUI>().text = "立ち去る";
+            btn.GetComponent<Button>().onClick.AddListener(() => {
+                fullScreenPanel.SetActive(false);
+                onCancel.Invoke();
+            });
+        }
+        else
+        {
+            // 手帳あり
+            fullScreenDesc.text = "生徒手帳を使いますか？\n(手帳を1冊消費して、中の様子を詳しく調べます)";
+
+            // 使うボタン
+            GameObject btnUse = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btnUse.GetComponentInChildren<TextMeshProUGUI>().text = "手帳を使う";
+            btnUse.GetComponent<Button>().onClick.AddListener(() => {
+                fullScreenPanel.SetActive(false);
                 onInvestigate.Invoke();
             });
 
-            // ボタン2: やめる
+            // やめるボタン
             GameObject btnCancel = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
             btnCancel.GetComponentInChildren<TextMeshProUGUI>().text = "やめる";
             btnCancel.GetComponent<Button>().onClick.AddListener(() => {
@@ -63,34 +81,47 @@ public class MenuManager : MonoBehaviour
                 onCancel.Invoke();
             });
         }
-        else
-        {
-            // --- パターンB: 手帳を持っていない場合 ---
-            fullScreenDesc.text = "生徒手帳を持っていません。\n(手帳がないと、中の様子を詳しく調べることはできません)";
 
-            // ボタン: 閉じる（立ち去る）のみ
-            GameObject btnClose = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btnClose.GetComponentInChildren<TextMeshProUGUI>().text = "立ち去る";
-            btnClose.GetComponent<Button>().onClick.AddListener(() => {
-                fullScreenPanel.SetActive(false);
-                onCancel.Invoke();
-            });
-        }
-
+        // レイアウト更新（表示崩れ防止）
         LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
 
     // --- ★追加: サイコロ結果表示 (前回の要望分) ---
+
+
+    // --- サイコロ結果表示 (修正版) ---
     public void ShowDiceResult(int result, Sprite diceSprite, UnityEngine.Events.UnityAction onConfirm)
     {
+        // 1. パネル表示
         fullScreenPanel.SetActive(true);
         foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
 
         fullScreenTitle.text = "ダイス結果";
-        // 画像表示用のImageコンポーネントがfullScreenPanelにある場合は設定してください。
-        // ここではシンプルにテキストで表示します。
-        fullScreenDesc.text = $"<size=300%>{result}</size>";
 
+        // 2. 画像の設定 (★ここを追加)
+        if (diceResultImage != null)
+        {
+            if (diceSprite != null)
+            {
+                diceResultImage.gameObject.SetActive(true);
+                diceResultImage.sprite = diceSprite;
+                // テキストはシンプルに
+                fullScreenDesc.text = "";
+            }
+            else
+            {
+                // 画像がない場合は非表示にしてテキストで大きく出す
+                diceResultImage.gameObject.SetActive(false);
+                fullScreenDesc.text = $"<size=300%>{result}</size>";
+            }
+        }
+        else
+        {
+            // Image設定がない場合
+            fullScreenDesc.text = $"<size=300%>{result}</size>";
+        }
+
+        // 3. 進むボタン
         GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
         btn.GetComponentInChildren<TextMeshProUGUI>().text = "進む";
         btn.GetComponent<Button>().onClick.AddListener(() =>

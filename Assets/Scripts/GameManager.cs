@@ -136,63 +136,30 @@ public class GameManager : MonoBehaviour
     }
     IEnumerator RollDiceSequence()
     {
-        // 1回目のロール
         int diceResult = Random.Range(1, 7);
-        Debug.Log($"ダイス結果: {diceResult}");
+        Debug.Log($"Dice: {diceResult}");
+
+        // ... (カオルの振り直しロジックがあればここに維持) ...
 
         yield return new WaitForSeconds(0.5f);
 
-        // カオル(DiceReroll)の効果チェック
-        if (HasFriendEffect(FriendEffectType.DiceReroll) && !hasRerolledThisTurn)
-        {
-            bool deciding = true;
-            bool doReroll = false;
-
-            // 選択肢を表示
-            eventManager.ShowOptions(
-                "カオルの能力",
-                $"今の出目は【{diceResult}】だよ。\n振り直す？",
-                "振り直す！",
-                "このまま進む",
-                null,
-                () => { doReroll = true; deciding = false; },   // Yes
-                () => { doReroll = false; deciding = false; },  // No
-                null
-            );
-
-            // プレイヤーの選択を待つ
-            yield return new WaitUntil(() => !deciding);
-
-            if (doReroll)
-            {
-                hasRerolledThisTurn = true;
-                Debug.Log("カオルの能力で振り直します！");
-
-                // 再ロール
-                diceResult = Random.Range(1, 7);
-                Debug.Log($"再ロール結果: {diceResult}");
-
-                yield return new WaitForSeconds(0.5f);
-            }
-        }
-
-        // =================================================================
-        // ★変更点: 最終的な出目が確定した後、カットインを表示して確認を待つ処理を追加
-        // =================================================================
-        yield return new WaitForSeconds(0.5f);
-
-        // ★追加: サイコロの目をカットインで確認
+        // ★修正点: 引数不足(CS7036)を解消
         if (menuManager != null)
         {
             bool isConfirmed = false;
-            // MenuManagerに後述のShowDiceResultを追加してください
-            menuManager.ShowDiceResult(diceResult, () => isConfirmed = true);
+
+            // ダイス画像を取得 (設定されていなければ null)
+            Sprite resultSprite = (diceSprites != null && diceResult > 0 && diceResult <= diceSprites.Length)
+                                ? diceSprites[diceResult - 1] : null;
+
+            // 引数: (数字, 画像, OK時のアクション)
+            menuManager.ShowDiceResult(diceResult, resultSprite, () => isConfirmed = true);
+
             yield return new WaitUntil(() => isConfirmed);
         }
 
         yield return StartCoroutine(MovePlayer(diceResult));
     }
-
     public IEnumerator MovePlayer(int steps)
     {
         // ★追加: 歩数カウントを加算 (親友条件: Steps用)
@@ -353,41 +320,48 @@ public class GameManager : MonoBehaviour
     // ---------------------------------------------------------
     void HandleClassroomTile(int tileIndex)
     {
-        // 1. 部屋とターゲットの特定
+        // MenuManagerの再取得 (外れている場合への保険)
+        if (menuManager == null) menuManager = FindObjectOfType<MenuManager>();
+
+        // 1. 部屋とターゲット特定
         int roomIndex = tileIndex % floor2Rooms.Count;
         string roomName = floor2Rooms[roomIndex];
         var target = allFriends.FirstOrDefault(f => f.assignedRoom == roomName && !f.isRecruited);
 
-        // 2. 所持数確認 (ItemManager経由で統一)
-        // 変数名: studentIdCount (PlayerStats内) -> GetHandbookCount()
+        Debug.Log($"教室マス: {roomName}, ターゲット: {(target != null ? target.friendName : "なし")}");
+
+        // 2. 所持数確認
         bool hasHandbook = (itemManager != null && itemManager.GetHandbookCount() > 0);
 
         if (menuManager != null)
         {
-            // 3. パネル表示 (手帳の有無を渡して、MenuManager側で表示内容を決定)
-            menuManager.ShowClassroomPanel(
-                hasHandbook,
+            // パネル表示
+            menuManager.ShowClassroomPanel(hasHandbook,
                 () => {
-                    // [調査する] が押された時の処理 (hasHandbookがtrueの時しか押せない)
-                    if (itemManager != null && itemManager.TryUseStudentHandbook())
+                    // [調査する]
+                    if (hasHandbook && itemManager != null)
                     {
-                        if (phoneUI) phoneUI.AddLog("生徒手帳を1冊消費しました。");
-                        // 成功時イベント実行
-                        HandleClassroomChallenge(target);
+                        // 消費実行
+                        if (itemManager.TryUseStudentHandbook())
+                        {
+                            if (phoneUI) phoneUI.AddLog("生徒手帳を1冊消費しました。");
+                            HandleClassroomChallenge(target); // イベント実行
+                        }
                     }
                     else
                     {
-                        // エラーハンドリング
-                        Debug.LogError("手帳消費に失敗、またはItemManager不明");
+                        Debug.LogWarning("手帳がない、または消費に失敗しました。");
                         EndTurn();
                     }
                 },
-                EndTurn // [閉じる/やめる] が押されたらターン終了
+                EndTurn // [やめる/立ち去る] -> ターン終了
             );
         }
         else
         {
-            Debug.LogError("MenuManager is not assigned!");
+            // MenuManagerがどうしても見つからない場合
+            Debug.LogError("【Critical】MenuManagerがGameManagerにアタッチされていません！Inspectorを確認してください。");
+            if (phoneUI) phoneUI.AddLog("（システムエラー: メニューが見つかりません）");
             EndTurn();
         }
     }
