@@ -351,34 +351,38 @@ public class GameManager : MonoBehaviour
     // ---------------------------------------------------------
     // ★変更点2: 教室マスの処理 (確認フェーズの実装)
     // ---------------------------------------------------------
-    // 教室マスの処理
     void HandleClassroomTile(int tileIndex)
     {
-        // 部屋とターゲットの特定
+        // 1. 部屋とターゲットの特定
         int roomIndex = tileIndex % floor2Rooms.Count;
         string roomName = floor2Rooms[roomIndex];
         var target = allFriends.FirstOrDefault(f => f.assignedRoom == roomName && !f.isRecruited);
 
-        // ★ItemManagerを使って所持数を確認
+        // 2. 所持数確認 (ItemManager経由で統一)
+        // 変数名: studentIdCount (PlayerStats内) -> GetHandbookCount()
         bool hasHandbook = (itemManager != null && itemManager.GetHandbookCount() > 0);
 
         if (menuManager != null)
         {
-            // パネル表示 (MenuManager側で「手帳がある/ない」のメッセージを出し分ける)
-            menuManager.ShowClassroomPanel(hasHandbook,
+            // 3. パネル表示 (手帳の有無を渡して、MenuManager側で表示内容を決定)
+            menuManager.ShowClassroomPanel(
+                hasHandbook,
                 () => {
-                    // 「調査する」を選んだ場合 (手帳がある時のみ押せる)
-                    if (hasHandbook && itemManager != null)
+                    // [調査する] が押された時の処理 (hasHandbookがtrueの時しか押せない)
+                    if (itemManager != null && itemManager.TryUseStudentHandbook())
                     {
-                        // ★ここで消費を実行 (-1する)
-                        if (itemManager.TryUseStudentHandbook())
-                        {
-                            if (phoneUI) phoneUI.AddLog("生徒手帳を1冊消費しました。");
-                            HandleClassroomChallenge(target);
-                        }
+                        if (phoneUI) phoneUI.AddLog("生徒手帳を1冊消費しました。");
+                        // 成功時イベント実行
+                        HandleClassroomChallenge(target);
+                    }
+                    else
+                    {
+                        // エラーハンドリング
+                        Debug.LogError("手帳消費に失敗、またはItemManager不明");
+                        EndTurn();
                     }
                 },
-                EndTurn // 「やめる」または「戻る」
+                EndTurn // [閉じる/やめる] が押されたらターン終了
             );
         }
         else

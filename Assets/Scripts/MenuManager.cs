@@ -31,41 +31,47 @@ public class MenuManager : MonoBehaviour
     public GameObject fullScreenButtonPrefab;
 
     // --- 教室イベント用パネル表示（追加） ---
+    // --- ★修正: 教室イベント用パネル表示 ---
     public void ShowClassroomPanel(bool hasHandbook, UnityEngine.Events.UnityAction onInvestigate, UnityEngine.Events.UnityAction onCancel)
     {
+        // 1. パネルを必ず表示
         fullScreenPanel.SetActive(true);
+
+        // 2. 既存ボタンのクリア
         foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
 
         fullScreenTitle.text = "教室イベント";
 
-        if (!hasHandbook)
+        if (hasHandbook)
         {
-            // ★生徒手帳がない場合の演出テキスト
-            fullScreenDesc.text = "生徒手帳を持っていません。\n中の様子を詳しく調べることはできません。";
+            // --- パターンA: 手帳を持っている場合 ---
+            fullScreenDesc.text = "生徒手帳を持っています。\n手帳を1冊消費して、中の様子を調査しますか？";
 
-            // 戻るボタンのみ
-            GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btn.GetComponentInChildren<TextMeshProUGUI>().text = "立ち去る";
-            btn.GetComponent<Button>().onClick.AddListener(() => {
+            // ボタン1: 調査する
+            GameObject btnInvestigate = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btnInvestigate.GetComponentInChildren<TextMeshProUGUI>().text = "調査する";
+            btnInvestigate.GetComponent<Button>().onClick.AddListener(() => {
+                fullScreenPanel.SetActive(false); // 閉じてから実行
+                onInvestigate.Invoke();
+            });
+
+            // ボタン2: やめる
+            GameObject btnCancel = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btnCancel.GetComponentInChildren<TextMeshProUGUI>().text = "やめる";
+            btnCancel.GetComponent<Button>().onClick.AddListener(() => {
                 fullScreenPanel.SetActive(false);
                 onCancel.Invoke();
             });
         }
         else
         {
-            // 持っている場合
-            fullScreenDesc.text = "生徒手帳を使いますか？\n(手帳を1冊消費して、中の様子を詳しく調べます)";
+            // --- パターンB: 手帳を持っていない場合 ---
+            fullScreenDesc.text = "生徒手帳を持っていません。\n(手帳がないと、中の様子を詳しく調べることはできません)";
 
-            GameObject btn1 = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btn1.GetComponentInChildren<TextMeshProUGUI>().text = "手帳を使う";
-            btn1.GetComponent<Button>().onClick.AddListener(() => {
-                fullScreenPanel.SetActive(false);
-                onInvestigate.Invoke();
-            });
-
-            GameObject btn2 = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btn2.GetComponentInChildren<TextMeshProUGUI>().text = "やめる";
-            btn2.GetComponent<Button>().onClick.AddListener(() => {
+            // ボタン: 閉じる（立ち去る）のみ
+            GameObject btnClose = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btnClose.GetComponentInChildren<TextMeshProUGUI>().text = "立ち去る";
+            btnClose.GetComponent<Button>().onClick.AddListener(() => {
                 fullScreenPanel.SetActive(false);
                 onCancel.Invoke();
             });
@@ -74,6 +80,27 @@ public class MenuManager : MonoBehaviour
         LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
 
+    // --- ★追加: サイコロ結果表示 (前回の要望分) ---
+    public void ShowDiceResult(int result, Sprite diceSprite, UnityEngine.Events.UnityAction onConfirm)
+    {
+        fullScreenPanel.SetActive(true);
+        foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
+
+        fullScreenTitle.text = "ダイス結果";
+        // 画像表示用のImageコンポーネントがfullScreenPanelにある場合は設定してください。
+        // ここではシンプルにテキストで表示します。
+        fullScreenDesc.text = $"<size=300%>{result}</size>";
+
+        GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+        btn.GetComponentInChildren<TextMeshProUGUI>().text = "進む";
+        btn.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            fullScreenPanel.SetActive(false);
+            onConfirm.Invoke();
+        });
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
+    }
     // --- ★追加: アイテムメニューの構築 (MenuManager管轄) ---
     public void ShowItemList()
     {
@@ -134,26 +161,6 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    // ★追加: サイコロの目をカットインで表示
-    // ★追加: サイコロの目をカットインで表示
-    public void ShowDiceResult(int result, UnityEngine.Events.UnityAction onConfirm)
-    {
-        fullScreenPanel.SetActive(true);
-        foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
-
-        fullScreenTitle.text = "ダイス結果";
-        fullScreenDesc.text = $"<size=200%>{result}</size>\nが出ました！";
-
-        GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-        btn.GetComponentInChildren<TextMeshProUGUI>().text = "進む";
-        btn.GetComponent<Button>().onClick.AddListener(() =>
-        {
-            fullScreenPanel.SetActive(false);
-            onConfirm.Invoke();
-        });
-
-        LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
-    }
 
     // --- 以下、既存のメソッド ---
     void ClearList()
