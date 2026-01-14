@@ -271,7 +271,7 @@ public class MenuManager : MonoBehaviour
             {
                 CreateListButton(m.name, () =>
                 {
-                    ShowDetail(m.name, $"【彼氏ボーナス】\nタイプ: {m.effectType}\n毎ターン終了時にボーナスをくれます。", null);
+                    ShowDetail(m.name, $"【彼氏ボーナス】\nタイプ: {m.effectType}\n毎ターン終了時にType_AならGP,Type_Bなら友達のボーナスをくれます。", null);
                 });
             }
         }
