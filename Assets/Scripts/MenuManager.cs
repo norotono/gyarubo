@@ -208,6 +208,12 @@ public class MenuManager : MonoBehaviour
                 });
             }
         }
+        CreateListButton("閉じる", () =>
+        {
+            // PhoneUIManager経由でメニューを閉じる
+            var phoneUI = FindObjectOfType<PhoneUIManager>();
+            if (phoneUI) phoneUI.ShowDiceMode();
+        });
     }
 
     public void OnShinyuBtn()
@@ -224,6 +230,12 @@ public class MenuManager : MonoBehaviour
                 });
             }
         }
+        CreateListButton("閉じる", () =>
+        {
+            // PhoneUIManager経由でメニューを閉じる
+            var phoneUI = FindObjectOfType<PhoneUIManager>();
+            if (phoneUI) phoneUI.ShowDiceMode();
+        });
     }
 
     public void OnMaleFriendBtn()
@@ -241,6 +253,12 @@ public class MenuManager : MonoBehaviour
                 });
             }
         }
+        CreateListButton("閉じる", () =>
+        {
+            // PhoneUIManager経由でメニューを閉じる
+            var phoneUI = FindObjectOfType<PhoneUIManager>();
+            if (phoneUI) phoneUI.ShowDiceMode();
+        });
     }
 
     public void OnBoyfriendBtn()
@@ -257,6 +275,12 @@ public class MenuManager : MonoBehaviour
                 });
             }
         }
+        CreateListButton("閉じる", () =>
+        {
+            // PhoneUIManager経由でメニューを閉じる
+            var phoneUI = FindObjectOfType<PhoneUIManager>();
+            if (phoneUI) phoneUI.ShowDiceMode();
+        });
     }
 
     public void OnItemBtn()
@@ -315,6 +339,12 @@ public class MenuManager : MonoBehaviour
                 ShowDetail(iName, "このアイテムを使用しますか？", () => itemManager.UseItemByName(iName), "使う");
             });
         }
+        CreateListButton("閉じる", () =>
+        {
+            // PhoneUIManager経由でメニューを閉じる
+            var phoneUI = FindObjectOfType<PhoneUIManager>();
+            if (phoneUI) phoneUI.ShowDiceMode();
+        });
     }
 
     void CreateListButton(string label, UnityEngine.Events.UnityAction onClick)

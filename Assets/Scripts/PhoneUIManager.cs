@@ -212,19 +212,21 @@ public class PhoneUIManager : MonoBehaviour
     }
     public void ShowDiceMode()
     {
-        // 画面表示切り替え
+        // 1. エリア表示: ログ(DialogScroll)とメニューボタン(MenuArea)を表示
         if (diceArea) diceArea.SetActive(true);
-        if (dialogScroll) dialogScroll.SetActive(false);
+        if (dialogScroll) dialogScroll.SetActive(true); // ★ログを表示する
         if (menuArea) menuArea.SetActive(true);
 
-        // ★追加: アイテムウィンドウを強制的に閉じる
+        // 2. 被さっているウィンドウを強制的に閉じる
         if (itemPanel) itemPanel.SetActive(false);
 
-        // ★追加: MenuManagerの詳細パネルも閉じる
+        // 3. 詳細パネルも閉じる
         var menuMgr = FindObjectOfType<MenuManager>();
         if (menuMgr != null)
         {
             menuMgr.CloseDetail();
+            // 親友などのFullScreenPanelが開いている場合も考慮して閉じる
+            if (menuMgr.fullScreenPanel) menuMgr.fullScreenPanel.SetActive(false);
         }
     }
 

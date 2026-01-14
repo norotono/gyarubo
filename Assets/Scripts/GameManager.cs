@@ -136,34 +136,42 @@ public class GameManager : MonoBehaviour
     }
     IEnumerator RollDiceSequence()
     {
+        // 1回目のロール
         int diceResult = Random.Range(1, 7);
-        Debug.Log($"Dice: {diceResult}");
+        Debug.Log($"ダイス結果: {diceResult}");
 
-        // ... (カオルの振り直しロジックがあればここに維持) ...
-
+        // ★修正: カオル(DiceReroll)の効果チェック
         yield return new WaitForSeconds(0.5f);
 
-        // ★修正点: 引数不足(CS7036)を解消
-        if (menuManager != null)
+        if (HasFriendEffect(FriendEffectType.DiceReroll) && !hasRerolledThisTurn)
         {
-            bool isConfirmed = false;
+            bool deciding = true;
+            bool doReroll = false;
 
-            // ダイス画像を取得 (設定されていなければ null)
-            Sprite resultSprite = (diceSprites != null && diceResult > 0 && diceResult <= diceSprites.Length)
-                                ? diceSprites[diceResult - 1] : null;
+            eventManager.ShowOptions(
+                "カオルの能力",
+                $"今の出目は【{diceResult}】だよ。\n振り直す？",
+                "振り直す！",
+                "このまま進む",
+                null,
+                () => { doReroll = true; deciding = false; },   // Yes
+                () => { doReroll = false; deciding = false; },  // No
+                null
+            );
 
-            // 引数: (数字, 画像, OK時のアクション)
-            if (diceSprite != null)
+            yield return new WaitUntil(() => !deciding);
+
+            if (doReroll)
             {
-                diceResultImage.gameObject.SetActive(true);
-                diceResultImage.sprite = diceSprite;
-                // テキストはシンプルに
-                fullScreenDesc.text = "";
+                hasRerolledThisTurn = true;
+                Debug.Log("カオルの能力で振り直します！");
+                diceResult = Random.Range(1, 7);
+                Debug.Log($"再ロール結果: {diceResult}");
+                yield return new WaitForSeconds(0.5f);
             }
-
-            yield return new WaitUntil(() => isConfirmed);
         }
 
+        // 移動開始
         yield return StartCoroutine(MovePlayer(diceResult));
     }
     public IEnumerator MovePlayer(int steps)
@@ -239,6 +247,7 @@ public class GameManager : MonoBehaviour
         // 親友効果のチェック: ユナ（マス効果2倍）
         int mult = 1;
         if (type != "Middle" && type != "Shop" && HasFriendEffect(FriendEffectType.DoubleTileEffect)) mult = 2;
+        // ヘッダー更新とメニュー閉じ
 
         switch (type)
         {
@@ -254,6 +263,13 @@ public class GameManager : MonoBehaviour
                 HandleMiddleTile();
                 return;
 
+            case "Classroom":
+                HandleClassroomTile(tileIndex);
+                return;
+            case "Class":
+                HandleClassroomTile(tileIndex);
+                return;
+            
             case "Shop":
                 Debug.Log("【購買部】ピッタリ停止！ 20% OFF!");
                 StartCoroutine(RunShopTileSequence());
@@ -428,7 +444,7 @@ public class GameManager : MonoBehaviour
         if (HasFriendEffect(FriendEffectType.MobFriendPromote))
         {
             AddLog("マキの能力: 確実に親友(モブ)へ昇格させます！");
-            AddFriends(1); // 修正: AddFriends
+            AddFriends(10); // 修正: AddFriends
         }
         else
         {

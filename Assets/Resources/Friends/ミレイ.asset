@@ -15,4 +15,4 @@ MonoBehaviour:
   friendName: "\u30DF\u30EC\u30A4"
   faceIcon: {fileID: 0}
   isAi: 0
-  effectType: 1
+  effectType: 2
