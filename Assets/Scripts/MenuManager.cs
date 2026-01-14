@@ -38,54 +38,48 @@ public class MenuManager : MonoBehaviour
     // --- ★修正: 教室パネル (ボタンのクリアと生成を確実に) ---
     public void ShowClassroomPanel(bool hasHandbook, UnityEngine.Events.UnityAction onInvestigate, UnityEngine.Events.UnityAction onCancel)
     {
-        // パネルをアクティブ化
-        if (fullScreenPanel) fullScreenPanel.SetActive(true);
-        else Debug.LogError("MenuManager: FullScreenPanel is not assigned!");
-
-        // 古いボタンを削除
+        fullScreenPanel.SetActive(true);
         foreach (Transform child in fullScreenButtonRoot) Destroy(child.gameObject);
 
         fullScreenTitle.text = "教室イベント";
 
-        if (!hasHandbook)
+        if (hasHandbook)
         {
-            // 手帳なし
-            fullScreenDesc.text = "生徒手帳を持っていません。\n中の様子を詳しく調べることはできません。";
+            // --- ある場合 ---
+            fullScreenDesc.text = "生徒手帳を持っています。\n1冊消費して、中の様子を調査しますか？";
 
-            // 立ち去るボタン
-            GameObject btn = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btn.GetComponentInChildren<TextMeshProUGUI>().text = "立ち去る";
-            btn.GetComponent<Button>().onClick.AddListener(() => {
+            // 調査ボタン
+            GameObject btn1 = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btn1.GetComponentInChildren<TextMeshProUGUI>().text = "調査する";
+            btn1.GetComponent<Button>().onClick.AddListener(() => {
+                fullScreenPanel.SetActive(false);
+                onInvestigate.Invoke();
+            });
+
+            // やめるボタン
+            GameObject btn2 = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btn2.GetComponentInChildren<TextMeshProUGUI>().text = "やめる";
+            btn2.GetComponent<Button>().onClick.AddListener(() => {
                 fullScreenPanel.SetActive(false);
                 onCancel.Invoke();
             });
         }
         else
         {
-            // 手帳あり
-            fullScreenDesc.text = "生徒手帳を使いますか？\n(手帳を1冊消費して、中の様子を詳しく調べます)";
+            // --- ない場合 ---
+            fullScreenDesc.text = "生徒手帳がありません。\n（購買部で購入すると詳しく調べられます）";
 
-            // 使うボタン
-            GameObject btnUse = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btnUse.GetComponentInChildren<TextMeshProUGUI>().text = "手帳を使う";
-            btnUse.GetComponent<Button>().onClick.AddListener(() => {
-                fullScreenPanel.SetActive(false);
-                onInvestigate.Invoke();
-            });
-
-            // やめるボタン
-            GameObject btnCancel = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
-            btnCancel.GetComponentInChildren<TextMeshProUGUI>().text = "やめる";
-            btnCancel.GetComponent<Button>().onClick.AddListener(() => {
+            // 閉じるボタンのみ
+            GameObject btnClose = Instantiate(fullScreenButtonPrefab, fullScreenButtonRoot);
+            btnClose.GetComponentInChildren<TextMeshProUGUI>().text = "閉じる";
+            btnClose.GetComponent<Button>().onClick.AddListener(() => {
                 fullScreenPanel.SetActive(false);
                 onCancel.Invoke();
             });
         }
 
-        // レイアウト更新（表示崩れ防止）
         LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
-
     // --- ★追加: サイコロ結果表示 (前回の要望分) ---
 
 
@@ -408,10 +402,38 @@ public class MenuManager : MonoBehaviour
     {
         switch (type)
         {
-            case FriendEffectType.DiceReroll: return "1ターンに1度、ダイスを振り直せます。";
-            case FriendEffectType.CardGeneration: return "定期的に移動カードをくれます。";
-            case FriendEffectType.AutoFriend: return "毎ターン、友達を1人連れてきます。";
-            default: return "特別な効果はありません。";
+            case FriendEffectType.ShopDiscount:
+                return "購買部のアイテムが 20% OFF になります。";
+
+            case FriendEffectType.DiceReroll:
+                return "1ターンに1度、サイコロを振り直せます。";
+
+            case FriendEffectType.NullifyGPMinus:
+                return "GPが減るマスの効果を無効化します。";
+
+            case FriendEffectType.MobFriendPromote:
+                return "デート時に、確実に友達(モブ)が増えます。";
+
+            case FriendEffectType.BadEventToGP:
+                return "マイナスイベントをGP獲得に変換します。";
+
+            case FriendEffectType.GPMultiplier:
+                return "GP獲得マスの効果が 1.5倍 になります。";
+
+            case FriendEffectType.DoubleTileEffect:
+                return "マスの効果(増減)が 2倍 になります。";
+
+            case FriendEffectType.CardGeneration:
+                return "定期的に移動カードをプレゼントしてくれます。";
+
+            case FriendEffectType.AutoFriend:
+                return "毎ターン終了時、友達が1人増えます。";
+
+            case FriendEffectType.DoubleScoreOnJoin:
+                return "仲間になった時、友達の数が2倍になります。(発動済み)";
+
+            default:
+                return "特別な能力はありません。";
         }
     }
 }

@@ -153,7 +153,13 @@ public class GameManager : MonoBehaviour
                                 ? diceSprites[diceResult - 1] : null;
 
             // 引数: (数字, 画像, OK時のアクション)
-            menuManager.ShowDiceResult(diceResult, resultSprite, () => isConfirmed = true);
+            if (diceSprite != null)
+            {
+                diceResultImage.gameObject.SetActive(true);
+                diceResultImage.sprite = diceSprite;
+                // テキストはシンプルに
+                fullScreenDesc.text = "";
+            }
 
             yield return new WaitUntil(() => isConfirmed);
         }
@@ -320,48 +326,38 @@ public class GameManager : MonoBehaviour
     // ---------------------------------------------------------
     void HandleClassroomTile(int tileIndex)
     {
-        // MenuManagerの再取得 (外れている場合への保険)
-        if (menuManager == null) menuManager = FindObjectOfType<MenuManager>();
-
-        // 1. 部屋とターゲット特定
+        // 部屋とターゲット特定
         int roomIndex = tileIndex % floor2Rooms.Count;
         string roomName = floor2Rooms[roomIndex];
         var target = allFriends.FirstOrDefault(f => f.assignedRoom == roomName && !f.isRecruited);
 
-        Debug.Log($"教室マス: {roomName}, ターゲット: {(target != null ? target.friendName : "なし")}");
-
-        // 2. 所持数確認
+        // 手帳の有無
         bool hasHandbook = (itemManager != null && itemManager.GetHandbookCount() > 0);
 
         if (menuManager != null)
         {
-            // パネル表示
+            // ★変更: 条件分岐なしでパネルを呼び出す
             menuManager.ShowClassroomPanel(hasHandbook,
                 () => {
-                    // [調査する]
-                    if (hasHandbook && itemManager != null)
+                    // [調査する] ボタンの処理
+                    // ここで消費(-1)を実行
+                    if (itemManager != null && itemManager.TryUseStudentHandbook())
                     {
-                        // 消費実行
-                        if (itemManager.TryUseStudentHandbook())
-                        {
-                            if (phoneUI) phoneUI.AddLog("生徒手帳を1冊消費しました。");
-                            HandleClassroomChallenge(target); // イベント実行
-                        }
+                        if (phoneUI) phoneUI.AddLog("生徒手帳を消費して調査しました。");
+                        HandleClassroomChallenge(target);
                     }
                     else
                     {
-                        Debug.LogWarning("手帳がない、または消費に失敗しました。");
+                        // 何らかのエラーで消費できなかった場合
                         EndTurn();
                     }
                 },
-                EndTurn // [やめる/立ち去る] -> ターン終了
+                EndTurn // [閉じる/やめる] ボタンの処理 -> ターン終了
             );
         }
         else
         {
-            // MenuManagerがどうしても見つからない場合
-            Debug.LogError("【Critical】MenuManagerがGameManagerにアタッチされていません！Inspectorを確認してください。");
-            if (phoneUI) phoneUI.AddLog("（システムエラー: メニューが見つかりません）");
+            Debug.LogError("MenuManager is not assigned!");
             EndTurn();
         }
     }
