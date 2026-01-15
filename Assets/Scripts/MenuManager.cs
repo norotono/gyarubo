@@ -36,6 +36,9 @@ public class MenuManager : MonoBehaviour
     public Image diceResultImage;
 
     // --- 教室イベント用パネル表示（追加） ---
+
+
+
     // --- ★修正: 教室イベント用パネル表示 ---
     public void ShowFriendRecruited(FriendData friend, UnityEngine.Events.UnityAction onConfirm)
     {
@@ -394,22 +397,54 @@ public class MenuManager : MonoBehaviour
         btnObj.GetComponent<Button>().onClick.AddListener(onClick);
     }
 
-    void ShowDetail(string title, string content, UnityEngine.Events.UnityAction action, string btnLabel = "使う")
+    // 詳細パネル表示 (引数に画像を追加)
+    public void ShowDetail(string title, string content, UnityEngine.Events.UnityAction action, string btnLabel = "使う", Sprite icon = null)
     {
-        detailPanel.SetActive(true);
-        detailTitle.text = title;
-        detailDesc.text = content;
+        // パネルを表示
+        if (detailPanel) detailPanel.SetActive(true);
+        if (detailTitle) detailTitle.text = title;
+        if (detailDesc) detailDesc.text = content;
 
-        if (action != null)
+        // ★追加: 画像の表示切り替えロジック (カットインと同様)
+        if (detailImage != null)
+        {
+            if (icon != null)
+            {
+                detailImage.gameObject.SetActive(true);
+                detailImage.sprite = icon;
+                // 元の比率を保ちたい場合は preserveAspect を true にしてください
+                // detailImage.preserveAspect = true; 
+            }
+            else
+            {
+                // 画像がない場合は非表示
+                detailImage.gameObject.SetActive(false);
+            }
+        }
+
+        // ボタンの設定
+        if (actionButton)
         {
             actionButton.gameObject.SetActive(true);
-            actionBtnText.text = btnLabel;
+
+            // アクションがある場合はそのラベル、ない場合は「閉じる」
+            if (actionBtnText) actionBtnText.text = (action != null) ? btnLabel : "閉じる";
+
             actionButton.onClick.RemoveAllListeners();
-            actionButton.onClick.AddListener(action);
-        }
-        else
-        {
-            actionButton.gameObject.SetActive(false);
+            if (action != null)
+            {
+                actionButton.onClick.AddListener(() =>
+                {
+                    action.Invoke();
+                    // アクション後に閉じるかどうかは挙動次第ですが、通常は閉じる
+                    // CloseDetail(); 
+                });
+            }
+            else
+            {
+                // アクションがない＝確認だけなので、閉じるボタンとして機能
+                actionButton.onClick.AddListener(CloseDetail);
+            }
         }
     }
 
