@@ -19,8 +19,6 @@ public class PlayerStats : MonoBehaviour
         // 存在していない場合、自分をInstanceにする
         Instance = this;
 
-        // ★シーン遷移しても破壊しないようにする命令
-        DontDestroyOnLoad(gameObject);
     }
 
     // --- 基本資産 ---
@@ -48,6 +46,7 @@ public class PlayerStats : MonoBehaviour
     public int MaleFriendCount => maleFriendsList.Count;
     public int BoyfriendCount => boyfriendList.Count;
     public int TotalMaleCount => maleFriendsList.Count + boyfriendList.Count;
+    public static int FinalFriendsCount = 0;
 
     // --- 所持アイテム ---
     public List<int> moveCards = new List<int>(); // 変数名統一

@@ -23,8 +23,6 @@ public class StartSceneManager : MonoBehaviour
     // --- PLAYボタン ---
     public void OnPlayButtonClicked()
     {
-        // データを初期化してからゲームシーンへ
-        if (PlayerStats.Instance != null) PlayerStats.Instance.ResetData();
         SceneManager.LoadScene("GameScene");
     }
 

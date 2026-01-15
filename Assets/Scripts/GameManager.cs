@@ -85,6 +85,7 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
+
         if (playerStats == null) playerStats = PlayerStats.Instance;
         isHandbookActive = false;
         // 1. 友達データの初期化
@@ -219,7 +220,10 @@ public class GameManager : MonoBehaviour
                         if (phoneUI) phoneUI.AddLog("ゴール前に購買部に立ち寄ります。");
                         yield return StartCoroutine(RunShopTileSequence());
                     }
-
+                    // ★追加: シーン移動前に、友達の数を静的変数に保存
+                    PlayerStats.FinalFriendsCount = playerStats.friends;
+                    Debug.Log($"スコア保存完了: {PlayerStats.FinalFriendsCount}人");
+                    PlayerStats.FinalFriendsCount = playerStats.friends;
                     Debug.Log("エンドシーンへ移動します。");
                     SceneManager.LoadScene("end"); // ★シーン名は正確に「end」
                     yield break; // 処理終了
