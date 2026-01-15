@@ -211,6 +211,20 @@ public class PhoneUIManager : MonoBehaviour
         }
     }
 
+    public void ClearLog()
+    {
+        if (dialogText) dialogText.text = "";
+    }
+
+    // ★追加: ダイス画像の表示/非表示を切り替える機能
+    public void SetDiceVisibility(bool isVisible)
+    {
+        if (diceDisplayImage != null)
+        {
+            diceDisplayImage.gameObject.SetActive(isVisible);
+        }
+    }
+
     [Header("Dice Display")]
     public Image diceDisplayImage; // ★Inspectorで dice_area 内のImageをアタッチ
 
@@ -253,6 +267,10 @@ public class PhoneUIManager : MonoBehaviour
         {
             menuMgr.CloseDetail();
             if (menuMgr.fullScreenPanel) menuMgr.fullScreenPanel.SetActive(false);
+        }
+        if (diceDisplayImage && diceDisplayImage.sprite != null)
+        {
+            diceDisplayImage.gameObject.SetActive(true);
         }
     }
 

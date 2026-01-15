@@ -10,24 +10,24 @@ public class MenuManager : MonoBehaviour
     public ItemManager itemManager;
 
     [Header("UI Containers")]
-    public Transform listContent; 
-    public GameObject listButtonPrefab; 
+    public Transform listContent;
+    public GameObject listButtonPrefab;
 
     [Header("Smartphone Screen")]
-    public TextMeshProUGUI headerText; 
+    public TextMeshProUGUI headerText;
 
     [Header("Detail Panel")]
-    public GameObject detailPanel;      
-    public TextMeshProUGUI detailTitle; 
-    public TextMeshProUGUI detailDesc;  
-    public Button actionButton;         
-    public TextMeshProUGUI actionBtnText; 
+    public GameObject detailPanel;
+    public TextMeshProUGUI detailTitle;
+    public TextMeshProUGUI detailDesc;
+    public Button actionButton;
+    public TextMeshProUGUI actionBtnText;
 
     [Header("--- Full Screen Overlay UI ---")]
-    public GameObject fullScreenPanel;        
-    public TextMeshProUGUI fullScreenTitle;   
-    public TextMeshProUGUI fullScreenDesc;    
-    public Transform fullScreenButtonRoot;    
+    public GameObject fullScreenPanel;
+    public TextMeshProUGUI fullScreenTitle;
+    public TextMeshProUGUI fullScreenDesc;
+    public Transform fullScreenButtonRoot;
     public GameObject fullScreenButtonPrefab;
     // fullScreenPanelの中に新しくImageを作ってアタッチするか、diceResultImageを流用してもOKです
     public Image friendFaceImage;
@@ -35,9 +35,17 @@ public class MenuManager : MonoBehaviour
     // ★追加: ダイス画像を表示するためのImageコンポーネント
     public Image diceResultImage;
 
-    // --- 教室イベント用パネル表示（追加） ---
-
-
+    // --- PhoneUIManager取得用のヘルパープロパティ ---
+    private PhoneUIManager _phoneUI;
+    private PhoneUIManager phoneUI
+    {
+        get
+        {
+            if (_phoneUI == null)
+                _phoneUI = FindFirstObjectByType<PhoneUIManager>();
+            return _phoneUI;
+        }
+    }
 
     // --- ★修正: 教室イベント用パネル表示 ---
     public void ShowFriendRecruited(FriendData friend, UnityEngine.Events.UnityAction onConfirm)
@@ -78,6 +86,7 @@ public class MenuManager : MonoBehaviour
             onConfirm.Invoke();
         });
     }
+
     // --- ★修正: 教室パネル (ボタンのクリアと生成を確実に) ---
     public void ShowClassroomPanel(bool hasHandbook, UnityEngine.Events.UnityAction onInvestigate, UnityEngine.Events.UnityAction onCancel)
     {
@@ -123,8 +132,6 @@ public class MenuManager : MonoBehaviour
 
         LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
-    // --- ★追加: サイコロ結果表示 (前回の要望分) ---
-
 
     // --- サイコロ結果表示 (修正版) ---
     public void ShowDiceResult(int result, Sprite diceSprite, UnityEngine.Events.UnityAction onConfirm)
@@ -169,164 +176,9 @@ public class MenuManager : MonoBehaviour
 
         LayoutRebuilder.ForceRebuildLayoutImmediate(fullScreenPanel.GetComponent<RectTransform>());
     }
+
     // --- ★追加: アイテムメニューの構築 (MenuManager管轄) ---
     public void ShowItemList()
-    {
-        ClearList(); // 既存リストをクリア
-        headerText.text = "【アイテム一覧】";
-
-        // 1. 移動カード
-        var cardCounts = itemManager.GetCardCounts();
-        foreach (var kvp in cardCounts)
-        {
-            int num = kvp.Key;
-            int count = kvp.Value;
-            if (count > 0)
-            {
-                CreateListButton($"移動カード [{num}]  x{count}", () =>
-                {
-                    ShowDetail(
-                        $"移動カード [{num}]",
-                        "使用するとサイコロを振らずに、この数字の分だけ進めます。",
-                        () => itemManager.UseMovementCard(num),
-                        "使う"
-                    );
-                });
-            }
-        }
-
-        // 2. 生徒手帳 (ItemManager経由で取得)
-        int hbCount = itemManager.GetHandbookCount();
-        string hbLabel = (hbCount > 0) ? $"生徒手帳 (所持: {hbCount})" : "生徒手帳 (未所持)";
-        CreateListButton(hbLabel, () =>
-        {
-            string desc = (hbCount > 0)
-                ? "【効果】\n教室マスで使うと、中の様子を詳しく調べられます。\n(使うと1冊消費します)"
-                : "【未所持】\nこれがないと教室の中を詳しく調べられません。\n購買部で購入しましょう。";
-            // ボタンアクションは無し（詳細表示のみ）
-            ShowDetail("生徒手帳", desc, null);
-        });
-
-        // 3. その他アイテム
-        var invCounts = itemManager.GetItemCounts();
-        foreach (var kvp in invCounts)
-        {
-            string iName = kvp.Key;
-            int count = kvp.Value;
-            CreateListButton($"{iName}  x{count}", () =>
-            {
-                ShowDetail(iName, "このアイテムを使用しますか？", () => itemManager.UseItemByName(iName), "使う");
-            });
-        }
-
-        // 4. プレゼント
-        if (gameManager.playerStats.present > 0)
-        {
-            CreateListButton($"プレゼント x{gameManager.playerStats.present}", () =>
-            {
-                ShowDetail("プレゼント", "特定のイベントで渡すと親密度が上がります。", null);
-            });
-        }
-    }
-
-
-    // --- 以下、既存のメソッド ---
-    void ClearList()
-    {
-        foreach (Transform child in listContent) Destroy(child.gameObject);
-        detailPanel.SetActive(false); 
-    }
-
-    public void OnInfoBtn()
-    {
-        ClearList();
-        headerText.text = "【秘密の情報】";
-        foreach (var f in gameManager.allFriends)
-        {
-            if (f.isHintRevealed)
-            {
-                CreateListButton(f.friendName, () =>
-                {
-                    ShowDetail(f.friendName, $"【出現条件ヒント】\n\n{f.GetHintText()}", null);
-                });
-            }
-        }
-        CreateListButton("閉じる", () =>
-        {
-            // PhoneUIManager経由でメニューを閉じる
-            var phoneUI = FindObjectOfType<PhoneUIManager>();
-            if (phoneUI) phoneUI.ShowDiceMode();
-        });
-    }
-
-    public void OnShinyuBtn()
-    {
-        ClearList();
-        headerText.text = "【親友リスト】";
-        foreach (var f in gameManager.allFriends)
-        {
-            if (f.isRecruited)
-            {
-                CreateListButton(f.friendName, () =>
-                {
-                    ShowDetail(f.friendName, $"【親友効果】\n\nタイプ: {f.effectType}\n{GetEffectDescription(f.effectType)}", null);
-                });
-            }
-        }
-        CreateListButton("閉じる", () =>
-        {
-            // PhoneUIManager経由でメニューを閉じる
-            var phoneUI = FindObjectOfType<PhoneUIManager>();
-            if (phoneUI) phoneUI.ShowDiceMode();
-        });
-    }
-
-    public void OnMaleFriendBtn()
-    {
-        ClearList();
-        headerText.text = "【男友達】";
-        foreach (var m in gameManager.playerStats.maleFriendsList)
-        {
-            if (!m.isBoyfriend)
-            {
-                string label = $"{m.name} (♡{m.currentAffection:F0})";
-                CreateListButton(label, () =>
-                {
-                    ShowDetail(m.name, $"現在の親密度: {m.currentAffection:F0}\n\n仲良くなれば彼氏になるかも？", null);
-                });
-            }
-        }
-        CreateListButton("閉じる", () =>
-        {
-            // PhoneUIManager経由でメニューを閉じる
-            var phoneUI = FindObjectOfType<PhoneUIManager>();
-            if (phoneUI) phoneUI.ShowDiceMode();
-        });
-    }
-
-    public void OnBoyfriendBtn()
-    {
-        ClearList();
-        headerText.text = "【彼氏】";
-        foreach (var m in gameManager.playerStats.boyfriendList) 
-        {
-            if (m.isBoyfriend)
-            {
-                CreateListButton(m.name, () =>
-                {
-                    ShowDetail(m.name, $"【彼氏ボーナス】\nタイプ: {m.effectType}\n毎ターン終了時にType_AならGP,Type_Bなら友達のボーナスをくれます。", null);
-                });
-            }
-        }
-        CreateListButton("閉じる", () =>
-        {
-            // PhoneUIManager経由でメニューを閉じる
-            var phoneUI = FindObjectOfType<PhoneUIManager>();
-            if (phoneUI) phoneUI.ShowDiceMode();
-        });
-    }
-
-    public void OnItemBtn()
     {
         RefreshItemList();
     }
@@ -337,6 +189,9 @@ public class MenuManager : MonoBehaviour
     {
         ClearList(); // 既存のリストをクリア
         headerText.text = "【所持アイテム】";
+
+        // ★修正: phoneUI変数が無いエラーを回避
+        if (phoneUI) phoneUI.SetDiceVisibility(false);
 
         // 1. 移動カードの表示
         // (ItemManagerにGetCardCountsがある前提)
@@ -382,12 +237,168 @@ public class MenuManager : MonoBehaviour
                 ShowDetail(iName, "このアイテムを使用しますか？", () => itemManager.UseItemByName(iName), "使う");
             });
         }
+
+        // 4. プレゼント
+        if (gameManager.playerStats.present > 0)
+        {
+            CreateListButton($"プレゼント x{gameManager.playerStats.present}", () =>
+            {
+                ShowDetail("プレゼント", "特定のイベントで渡すと親密度が上がります。", null);
+            });
+        }
+
+        // 5. 閉じるボタン
         CreateListButton("閉じる", () =>
         {
-            // PhoneUIManager経由でメニューを閉じる
-            var phoneUI = FindFirstObjectByType<PhoneUIManager>();
-            if (phoneUI) phoneUI.ShowDiceMode();
+            ClearList(); // ボタンを消す
+
+            // ★修正: phoneUIプロパティを使用
+            if (phoneUI)
+            {
+                phoneUI.ShowDiceMode(); // 元に戻す
+            }
         });
+    }
+
+
+    // --- 以下、既存のメソッド ---
+    void ClearList()
+    {
+        foreach (Transform child in listContent) Destroy(child.gameObject);
+        detailPanel.SetActive(false);
+    }
+
+    public void OnInfoBtn()
+    {
+        ClearList();
+        headerText.text = "【秘密の情報】";
+
+        // ★修正
+        if (phoneUI) phoneUI.SetDiceVisibility(false);
+
+        foreach (var f in gameManager.allFriends)
+        {
+            if (f.isHintRevealed)
+            {
+                CreateListButton(f.friendName, () =>
+                {
+                    ShowDetail(f.friendName, $"【出現条件ヒント】\n\n{f.GetHintText()}", null);
+                });
+            }
+        }
+        CreateListButton("閉じる", () =>
+        {
+            ClearList(); // ボタンを消す
+
+            // ★修正
+            if (phoneUI)
+            {
+                phoneUI.ShowDiceMode(); // 元に戻す
+            }
+        });
+    }
+
+    public void OnShinyuBtn()
+    {
+        ClearList();
+        headerText.text = "【親友リスト】";
+
+        // ★修正
+        if (phoneUI) phoneUI.SetDiceVisibility(false);
+
+        foreach (var f in gameManager.allFriends)
+        {
+            if (f.isRecruited)
+            {
+                CreateListButton(f.friendName, () =>
+                {
+                    // 親友画像を渡す
+                    ShowDetail(
+                        f.friendName,
+                        $"【親友効果】\n\nタイプ: {f.effectType}\n{GetEffectDescription(f.effectType)}",
+                        null,
+                        "閉じる",
+                        f.faceIcon
+                    );
+                });
+            }
+        }
+        CreateListButton("閉じる", () =>
+        {
+            ClearList(); // ボタンを消す
+
+            // ★修正
+            if (phoneUI)
+            {
+                phoneUI.ShowDiceMode(); // 元に戻す
+            }
+        });
+    }
+
+    public void OnMaleFriendBtn()
+    {
+        ClearList();
+        headerText.text = "【男友達】";
+
+        // ★修正
+        if (phoneUI) phoneUI.SetDiceVisibility(false);
+
+        foreach (var m in gameManager.playerStats.maleFriendsList)
+        {
+            if (!m.isBoyfriend)
+            {
+                string label = $"{m.name} (♡{m.currentAffection:F0})";
+                CreateListButton(label, () =>
+                {
+                    ShowDetail(m.name, $"現在の親密度: {m.currentAffection:F0}\n\n仲良くなれば彼氏になるかも？", null);
+                });
+            }
+        }
+        CreateListButton("閉じる", () =>
+        {
+            ClearList(); // ボタンを消す
+
+            // ★修正
+            if (phoneUI)
+            {
+                phoneUI.ShowDiceMode(); // 元に戻す
+            }
+        });
+    }
+
+    public void OnBoyfriendBtn()
+    {
+        ClearList();
+        headerText.text = "【彼氏】";
+
+        // ★修正
+        if (phoneUI) phoneUI.SetDiceVisibility(false);
+
+        foreach (var m in gameManager.playerStats.boyfriendList)
+        {
+            if (m.isBoyfriend)
+            {
+                CreateListButton(m.name, () =>
+                {
+                    ShowDetail(m.name, $"【彼氏ボーナス】\nタイプ: {m.effectType}\n毎ターン終了時にType_AならGP,Type_Bなら友達のボーナスをくれます。", null);
+                });
+            }
+        }
+        CreateListButton("閉じる", () =>
+        {
+            ClearList(); // ボタンを消す
+
+            // ★修正
+            if (phoneUI)
+            {
+                phoneUI.ShowDiceMode(); // 元に戻す
+            }
+        });
+    }
+
+    public void OnItemBtn()
+    {
+        RefreshItemList();
     }
 
     void CreateListButton(string label, UnityEngine.Events.UnityAction onClick)
@@ -397,7 +408,7 @@ public class MenuManager : MonoBehaviour
         btnObj.GetComponent<Button>().onClick.AddListener(onClick);
     }
 
-    // 詳細パネル表示 (引数に画像を追加)
+    // ★修正: 画像(icon)を受け取れるように引数を追加
     public void ShowDetail(string title, string content, UnityEngine.Events.UnityAction action, string btnLabel = "使う", Sprite icon = null)
     {
         // パネルを表示
@@ -405,14 +416,14 @@ public class MenuManager : MonoBehaviour
         if (detailTitle) detailTitle.text = title;
         if (detailDesc) detailDesc.text = content;
 
-        // ★追加: 画像の表示切り替えロジック (カットインと同様)
+        // ★追加: 画像の表示設定 (親友確認などで使用)
         if (detailImage != null)
         {
             if (icon != null)
             {
                 detailImage.gameObject.SetActive(true);
                 detailImage.sprite = icon;
-                // 元の比率を保ちたい場合は preserveAspect を true にしてください
+                // 必要なら縦横比維持の設定を入れる
                 // detailImage.preserveAspect = true; 
             }
             else
@@ -433,10 +444,9 @@ public class MenuManager : MonoBehaviour
             actionButton.onClick.RemoveAllListeners();
             if (action != null)
             {
-                actionButton.onClick.AddListener(() =>
-                {
+                actionButton.onClick.AddListener(() => {
                     action.Invoke();
-                    // アクション後に閉じるかどうかは挙動次第ですが、通常は閉じる
+                    // アクション実行後に閉じるかどうかはケースバイケースですが、基本は閉じる
                     // CloseDetail(); 
                 });
             }
@@ -465,8 +475,8 @@ public class MenuManager : MonoBehaviour
         btn.GetComponentInChildren<TextMeshProUGUI>().text = "OK";
         btn.GetComponent<Button>().onClick.AddListener(() =>
         {
-            fullScreenPanel.SetActive(false); 
-            onOk.Invoke(); 
+            fullScreenPanel.SetActive(false);
+            onOk.Invoke();
         });
     }
 
