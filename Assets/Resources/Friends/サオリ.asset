@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: "\u30B5\u30AA\u30EA"
   m_EditorClassIdentifier: Assembly-CSharp::FriendData
   friendName: "\u30B5\u30AA\u30EA"
-  faceIcon: {fileID: 0}
+  faceIcon: {fileID: -2995895179439791246, guid: 8e66d3a52b96e9f40b1a03bd2229af70, type: 3}
   isAi: 0
   effectType: 8

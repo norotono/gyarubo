@@ -382,7 +382,7 @@ public class MenuManager : MonoBehaviour
         CreateListButton("閉じる", () =>
         {
             // PhoneUIManager経由でメニューを閉じる
-            var phoneUI = FindObjectOfType<PhoneUIManager>();
+            var phoneUI = FindFirstObjectByType<PhoneUIManager>();
             if (phoneUI) phoneUI.ShowDiceMode();
         });
     }

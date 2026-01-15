@@ -5,7 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEngine.Events;
 using System.Linq;
-
+using UnityEngine.SceneManagement; // ★追加: これがないとエラー(CS0103)になります
 public class GameManager : MonoBehaviour
 {
     [Header("--- Managers (Attach Scripts) ---")]
@@ -174,6 +174,11 @@ public class GameManager : MonoBehaviour
         {
             phoneUI.UpdateDiceImage(diceSprites[diceResult - 1]);
         }
+        if (diceResult == 1)
+        {
+            playerStats.diceOneCount++;
+            Debug.Log($"ダイスで1が出ました！(合計: {playerStats.diceOneCount}回)");
+        }
 
         yield return new WaitForSeconds(0.5f);
 
@@ -184,35 +189,57 @@ public class GameManager : MonoBehaviour
     {
         // ★追加: 歩数カウントを加算 (親友条件: Steps用)
         playerStats.totalSteps += steps;
+        bool passedShop = false;
 
         for (int i = 0; i < steps; i++)
         {
             currentTileIndex++;
 
-            // 進級・ゴール判定
+            // --- 移動中のショップ通過チェック ---
+            if (currentTileIndex < boardManager.totalTiles)
+            {
+                string type = boardManager.BoardLayout[currentTileIndex];
+                if (type == "Shop") passedShop = true;
+            }
+
+            // --- ゴール判定 ---
             if (currentTileIndex >= boardManager.totalTiles)
             {
-                if (currentGrade < 3)
+                // 3年生でゴール -> ゲーム終了
+                if (currentGrade >= 3)
                 {
-                    currentGrade++;
-                    currentTileIndex = 0;
-                    AddLog($"進級！ {currentGrade}年生になりました。");
+                    Debug.Log("ゲームクリア！(3年生完了)");
 
-                    boardManager.InitializeBoard(currentGrade);
-                    shopManager.InitializeShopItems(currentGrade, playerStats);
-                    yield return null;
+                    // コマをゴール位置に合わせる
+                    boardManager.MovePlayerPiece(boardManager.totalTiles - 1);
 
-                    boardManager.MovePlayerPiece(0);
-                    UpdateMainUI();
-                    yield return new WaitForSeconds(moveSpeed);
-                    continue;
+                    // ★修正: ショップを通っていたら、エンドシーンに行く前に買い物させる
+                    if (passedShop)
+                    {
+                        if (phoneUI) phoneUI.AddLog("ゴール前に購買部に立ち寄ります。");
+                        yield return StartCoroutine(RunShopTileSequence());
+                    }
+
+                    Debug.Log("エンドシーンへ移動します。");
+                    SceneManager.LoadScene("end"); // ★シーン名は正確に「end」
+                    yield break; // 処理終了
                 }
                 else
                 {
-                    currentTileIndex = boardManager.totalTiles - 1;
-                    boardManager.MovePlayerPiece(currentTileIndex);
-                    AddLog("ゲーム終了！");
-                    break;
+                    // 1,2年生 -> 進級処理
+                    currentGrade++;
+                    currentTileIndex = 0; // スタートに戻る
+                    boardManager.InitializeBoard(currentGrade);
+                    shopManager.InitializeShopItems(currentGrade, playerStats);
+
+                    if (phoneUI)
+                    {
+                        phoneUI.AddLog("進級しました！");
+                        phoneUI.UpdateHeaderText($"{currentGrade}年生 スタート");
+                    }
+
+                    // 進級時の演出があればここに入れる
+                    yield return new WaitForSeconds(1.0f);
                 }
             }
 

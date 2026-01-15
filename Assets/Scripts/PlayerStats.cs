@@ -6,10 +6,21 @@ using UnityEngine;
 public class PlayerStats : MonoBehaviour
 {
     public static PlayerStats Instance;
-
-    void Awake()
+    private void Awake()
     {
-        if (Instance == null) Instance = this;
+        // 既に他のPlayerStatsが存在している場合
+        if (Instance != null && Instance != this)
+        {
+            // 自分自身を破壊する（重複防止）
+            Destroy(gameObject);
+            return;
+        }
+
+        // 存在していない場合、自分をInstanceにする
+        Instance = this;
+
+        // ★シーン遷移しても破壊しないようにする命令
+        DontDestroyOnLoad(gameObject);
     }
 
     // --- 基本資産 ---
@@ -90,5 +101,36 @@ public class PlayerStats : MonoBehaviour
             case "Gal": galLv = Mathf.Min(galLv + amount, 5); break;
             case "Lemon": lemonLv = Mathf.Min(lemonLv + amount, 5); break;
         }
+    }
+    public void ResetData()
+    {
+        commuLv = 1;
+        galLv = 1;
+        lemonLv = 1;
+        gp = 3000;
+        friends = 0;
+
+        currentTurn = 1;
+        currentMonth = 4;
+        currentGrade = 1;
+
+        totalSteps = 0;
+        gpIncreaseTileCount = 0;
+        gpDecreaseTileCount = 0;
+        diceOneCount = 0;
+        shopSpentTotal = 0;
+        soloPlayConsecutive = 0;
+        maleContactCount = 0;
+
+        moveCards.Clear();
+        studentIdCount = 0;
+        present = 0;
+        albumPrice = 0;
+
+        // リストの中身もクリアする必要がある場合はここで行う
+        maleFriendsList.Clear();
+        boyfriendList.Clear();
+
+        Debug.Log("PlayerStatsをリセットしました");
     }
 }

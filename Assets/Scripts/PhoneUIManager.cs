@@ -223,6 +223,14 @@ public class PhoneUIManager : MonoBehaviour
             diceDisplayImage.sprite = sprite;
         }
     }
+    // ★追加: これがないとエラーになります
+    public void UpdateHeaderText(string text)
+    {
+        if (headerDateText != null)
+        {
+            headerDateText.text = text;
+        }
+    }
 
     // --- ★修正: 閉じるボタンの挙動 ---
     public void ShowDiceMode()
